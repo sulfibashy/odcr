@@ -33,7 +33,7 @@ pytest            # unit + end-to-end tests; unreachable databases are skipped
 
 1. Open an issue first for anything larger than a small fix.
 2. Add tests: unit tests for logic, an end-to-end test for anything that touches a database.
-3. `pytest` must pass. CI runs against PostgreSQL and MySQL on Python 3.9, 3.11 and 3.13.
+3. `pytest` must pass. CI runs against PostgreSQL and MySQL on Python 3.10, 3.12 and 3.13.
 4. Keep PRs small and focused.
 
 Bigger design changes go through a short RFC: an issue titled `RFC: ...` describing the problem, the proposal and alternatives.
