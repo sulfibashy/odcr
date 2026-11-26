@@ -1,0 +1,22 @@
+# Reconciliation: does the target hold exactly what the source sent, for this batch?
+# Source and target can be different platforms: add a second connection to odcr.yaml and name it here.
+kind: Reconciliation
+id: orders-source-to-target
+contract: orders
+source:
+  connection: main
+  object: orders
+  where: "{\"load_id\": \"{batch_id}\"}"
+target:
+  connection: main
+  object: orders
+  where: "{\"load_id\": \"{batch_id}\"}"
+checks:
+  - type: rowCount
+  - type: sum
+    column: amount
+    tolerance: 0.01
+  - type: distinctCount
+    column: customer_id
+  - type: missingKeys
+    column: order_id

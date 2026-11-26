@@ -1,0 +1,9 @@
+order_id,customer_id,status,amount,order_date,load_id
+1,101,NEW,10.50,2026-11-01,batch-001
+2,102,PAID,20.00,2026-11-01,batch-001
+3,103,SHIPPED,30.25,2026-11-02,batch-001
+4,101,CANCELLED,5.00,2026-11-02,batch-001
+10,,NEW,10.00,2026-11-03,batch-002
+11,105,LOST,15.00,2026-11-03,batch-002
+11,106,PAID,-3.00,2026-11-03,batch-002
+12,107,PAID,8.00,2026-11-03,batch-002

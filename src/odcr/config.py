@@ -13,6 +13,7 @@ import yaml
 from .meta import DEFAULT_META_SCHEMA
 
 _ENV = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+_FILE = re.compile(r"\$\{file:([^}]+)\}")
 
 
 class ConfigError(ValueError):
@@ -20,7 +21,9 @@ class ConfigError(ValueError):
 
 
 def interpolate(value: Any) -> Any:
+    """Resolve ${VAR}, ${VAR:-default} and ${file:/path/to/secret} (Docker / Kubernetes secrets)."""
     if isinstance(value, str):
+        value = _FILE.sub(lambda m: Path(os.path.expanduser(m.group(1))).read_text(encoding="utf-8").strip(), value)
         def sub(m: re.Match[str]) -> str:
             name, default = m.group(1), m.group(2)
             if name in os.environ:
@@ -42,6 +45,9 @@ class Config:
     meta_schema: str = DEFAULT_META_SCHEMA
     notifications: dict[str, Any] = field(default_factory=dict)
     on_fail: str = "quarantine"  # quarantine | log
+    meta_connection: str | None = None  # store meta tables on another connection (e.g. for read-only sources)
+    contracts: dict[str, Any] = field(default_factory=lambda: {"path": "contracts"})
+    base_dir: Path = field(default_factory=Path.cwd)
 
     def connection(self, name: str) -> dict[str, Any]:
         if name not in self.connections:
@@ -58,7 +64,7 @@ class Config:
         return list(self.notifications.get("platform_team") or [])
 
 
-def parse_config(doc: dict[str, Any] | None) -> Config:
+def parse_config(doc: dict[str, Any] | None, base_dir: Path | None = None) -> Config:
     doc = interpolate(doc or {})
     if not isinstance(doc, dict):
         raise ConfigError("Config must be a YAML mapping")
@@ -69,12 +75,35 @@ def parse_config(doc: dict[str, Any] | None) -> Config:
         if not isinstance(c, dict) or "type" not in c:
             raise ConfigError(f"connection '{name}' needs a 'type'")
     meta = doc.get("meta") or {}
+    contracts = doc.get("contracts") or {"path": "contracts"}
+    if isinstance(contracts, str):
+        contracts = {"path": contracts}
+    if meta.get("connection") and meta["connection"] not in conns:
+        raise ConfigError(f"meta.connection '{meta['connection']}' is not a defined connection")
     return Config(
         connections=conns,
         meta_schema=str(meta.get("schema", DEFAULT_META_SCHEMA)),
         notifications=doc.get("notifications") or {},
         on_fail=str(doc.get("on_fail", "quarantine")),
+        meta_connection=meta.get("connection"),
+        contracts=contracts,
+        base_dir=base_dir or Path.cwd(),
     )
+
+
+def load_dotenv(path: Path) -> None:
+    """Load KEY=value lines from a .env file into the environment (existing variables win)."""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip().removeprefix("export ").strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def load_config(path: str | Path | None) -> Config:
@@ -88,4 +117,5 @@ def load_config(path: str | Path | None) -> Config:
     p = Path(path)
     if not p.exists():
         raise ConfigError(f"Config file not found: {p}")
-    return parse_config(yaml.safe_load(p.read_text(encoding="utf-8")))
+    load_dotenv(p.resolve().parent / ".env")
+    return parse_config(yaml.safe_load(p.read_text(encoding="utf-8")), base_dir=p.resolve().parent)

@@ -1,0 +1,38 @@
+# odcr project configuration. ${VAR} and ${VAR:-default} come from environment variables;
+# ${file:/run/secrets/name} reads a secret file. Never put passwords or tokens in this file.
+name: duckdb_example
+
+# The central contract repository. A folder in this project, or a shared Git repository:
+#   contracts: {git: https://github.com/acme/data-contracts.git, ref: main, path: contracts, token_env: GIT_TOKEN}
+contracts:
+  path: contracts
+
+connections:
+  main:
+    type: duckdb
+    path: ${DUCKDB_PATH:-odcr.duckdb}
+
+# Meta tables (runs, check results, quarantine, notifications, reconciliation, pipeline events) are
+# created in this schema on the platform itself. Use `connection:` to store them on another platform.
+meta:
+  schema: odcr_meta
+
+# quarantine: failed batches are logged in quarantine_log and the command exits with code 1.
+on_fail: quarantine
+
+notifications:
+  notify_on: [fail, warn]
+  # The platform team hears about every failure, on every contract.
+  platform_team:
+    - type: console
+    - type: teams
+      url: ${PLATFORM_TEAMS_WEBHOOK}
+  smtp:                      # used by email channels; TLS is verified with the system CA store
+    host: ${SMTP_HOST:-localhost}
+    port: ${SMTP_PORT:-587}
+    starttls: true
+    user: ${SMTP_USER:-}
+    password: ${SMTP_PASSWORD:-}
+    from: odcr@example.com
+  # ca_bundle: /etc/ssl/certs/corporate-ca.pem   # private CA / TLS-inspecting proxy
+  # proxy: http://proxy.example.com:8080

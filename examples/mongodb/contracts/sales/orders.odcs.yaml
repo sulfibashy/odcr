@@ -1,0 +1,73 @@
+# ODCS v3 data contract (Open Data Contract Standard). One file per dataset; reviewed like code.
+apiVersion: v3.0.2
+kind: DataContract
+id: orders
+name: Orders
+version: 1.0.0
+status: active
+domain: sales
+dataProduct: orders
+description:
+  purpose: Orders from the web shop. Arrives as hourly batches, CDC or a stream; checked the moment it lands.
+
+team:
+  - username: order-team-lead
+    role: owner
+
+# The source team is notified here when this contract is broken.
+# Supported tools: slack, teams, email, googlechat, discord, pagerduty, opsgenie, webhook
+support:
+  - channel: "#orders-data-alerts"
+    tool: slack
+    url: ${ORDERS_SLACK_WEBHOOK}
+  - channel: orders-team
+    tool: teams
+    url: ${ORDERS_TEAMS_WEBHOOK}
+  - channel: orders-team@example.com
+    tool: email
+    url: mailto:orders-team@example.com
+
+schema:
+  - name: orders
+    physicalName: orders
+    physicalType: table
+    properties:
+      - name: order_id
+        logicalType: integer
+        primaryKey: true          # required + unique
+      - name: customer_id
+        logicalType: integer
+        required: true
+      - name: status
+        logicalType: string
+        required: true
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues: [NEW, PAID, SHIPPED, CANCELLED]
+            mustBe: 0
+      - name: amount
+        logicalType: number
+        quality:
+          - type: library
+            metric: nullValues
+            mustBeLessOrEqualTo: 1
+            unit: percent
+            severity: warning     # notify, but do not stop the pipeline
+      - name: order_date
+        logicalType: date
+        required: true
+      - name: load_id
+        logicalType: string
+        description: Batch, micro-batch, CDC transaction or file id
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+      - type: custom
+        name: orders.no_negative_amounts
+        engine: mongodb
+        description: Amounts must never be negative
+        implementation: '{"amount": {"$lt": 0}}'
+        mustBe: 0

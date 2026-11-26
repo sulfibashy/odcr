@@ -10,4 +10,4 @@ labels: adapter, good first issue
 
 **Can you run it locally or in Docker for the tests?**
 
-See docs/adding-an-adapter.md for the steps.
+See docs/contributing/adding-an-adapter.md for the steps.

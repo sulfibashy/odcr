@@ -5,7 +5,7 @@ All tables are append-only logs so history is never lost.
 
 from __future__ import annotations
 
-from .adapters.base import Adapter
+from typing import Any
 
 DEFAULT_META_SCHEMA = "odcr_meta"
 
@@ -51,21 +51,18 @@ TABLES: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def table_name(adapter: Adapter, schema: str, table: str) -> str:
-    return f"{adapter.quote(schema)}.{adapter.quote(table)}"
-
-
-def ddl(adapter: Adapter, schema: str = DEFAULT_META_SCHEMA) -> list[str]:
+def ddl(adapter: Any, schema: str = DEFAULT_META_SCHEMA) -> list[str]:
+    """The CREATE statements an SQL adapter runs for the meta tables (for docs and review)."""
     types = adapter.meta_types()
-    statements: list[str] = []
+    out = []
+    if not adapter.meta_in_current_schema:
+        out.append(adapter.create_schema_sql(schema))
     for table, cols in TABLES.items():
         cols_sql = ", ".join(f"{adapter.quote(c)} {types[t]}" for c, t in cols)
-        statements.extend(adapter.create_table_sql(table_name(adapter, schema, table), cols_sql))
-    return statements
+        out.append(adapter.create_table_sql(adapter.meta_table(schema, table), cols_sql))
+    return out
 
 
-def ensure_meta(adapter: Adapter, schema: str = DEFAULT_META_SCHEMA) -> None:
-    """Create the meta schema and tables if they do not exist (idempotent)."""
-    adapter.create_schema(schema)
-    for stmt in ddl(adapter, schema):
-        adapter.execute(stmt)
+def ensure_meta(adapter: Any, schema: str = DEFAULT_META_SCHEMA) -> None:
+    """Create the meta schema and tables if they do not exist (idempotent, any adapter)."""
+    adapter.meta_ensure(schema)

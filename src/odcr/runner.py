@@ -8,11 +8,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from . import notify
-from .adapters.base import Adapter, type_matches
-from .checks import Check, build_checks, compare, describe_expectation, relation
+from .adapters.base import Adapter, UnsupportedCheck, type_matches
+from .checks import Check, build_checks, compare, describe_expectation
 from .config import Config
 from .contract import Contract, SchemaObject
-from .meta import ensure_meta, table_name
 
 PASSED, FAILED, WARNING, ERROR, SKIPPED = "passed", "failed", "warning", "error", "skipped"
 
@@ -73,8 +72,9 @@ class RunResult:
         lines = [f"Contract {self.contract_id} v{self.contract_version} batch={self.batch_id or '-'}: "
                  f"{self.status.upper()}"]
         for o in self.objects:
-            lines.append(f"  {o.object_name}: {o.status.upper()} ({o.rows_checked if o.rows_checked is not None else '?'}"
-                         f" rows, {len(o.failed)} failed, {len(o.warned)} warnings)")
+            rows = o.rows_checked if o.rows_checked is not None else "?"
+            lines.append(f"  {o.object_name}: {o.status.upper()} ({rows} rows, {len(o.failed)} failed, "
+                         f"{len(o.warned)} warnings)")
             for r in o.failed + o.warned:
                 lines.append(f"    - [{r.status}] {r.check_id}: expected {r.expected or 'ok'}, got {r.actual}"
                              + (f" ({r.message})" if r.message else ""))
@@ -87,11 +87,8 @@ class RunResult:
             "batch_id": self.batch_id,
             "status": self.status,
             "objects": [
-                {
-                    "run_id": o.run_id, "object": o.object_name, "status": o.status,
-                    "rows_checked": o.rows_checked, "error": o.error,
-                    "checks": [r.__dict__ for r in o.results],
-                }
+                {"run_id": o.run_id, "object": o.object_name, "status": o.status, "rows_checked": o.rows_checked,
+                 "error": o.error, "checks": [r.__dict__ for r in o.results]}
                 for o in self.objects
             ],
             "notifications": [
@@ -103,12 +100,12 @@ class RunResult:
 
 
 def _schema_checks(adapter: Adapter, obj: SchemaObject) -> tuple[list[CheckResult], set[str]]:
-    """Compare the contract's columns with the live table. Returns results and missing columns."""
+    """Compare the contract's columns with the live object. Returns results and the missing columns."""
     live = adapter.columns(obj.physical_name)
     results: list[CheckResult] = []
     if not live:
         results.append(CheckResult(f"{obj.name}.exists", "schema", obj.name, None, "error",
-                                   "table exists", "missing", FAILED, f"{obj.physical_name} not found"))
+                                   "object exists", "missing", FAILED, f"{obj.physical_name} not found"))
         return results, {p.name.lower() for p in obj.properties}
     missing: set[str] = set()
     for prop in obj.properties:
@@ -119,14 +116,11 @@ def _schema_checks(adapter: Adapter, obj: SchemaObject) -> tuple[list[CheckResul
                                        "error", "column exists", "missing", FAILED))
             continue
         match = type_matches(prop.logical_type, live[key])
-        if match is False:
+        if match is not None:
             results.append(CheckResult(f"{obj.name}.{prop.name}.type", "schema", obj.name, prop.name, "error",
-                                       f"logicalType {prop.logical_type}", live[key], FAILED,
-                                       "physical type does not match the contract"))
-        elif match is True:
-            results.append(CheckResult(f"{obj.name}.{prop.name}.type", "schema", obj.name, prop.name, "error",
-                                       f"logicalType {prop.logical_type}", live[key], PASSED))
-    extra = sorted(set(live) - {p.name.lower() for p in obj.properties})
+                                       f"logicalType {prop.logical_type}", live[key], PASSED if match else FAILED,
+                                       "" if match else "physical type does not match the contract"))
+    extra = sorted(set(live) - {p.name.lower() for p in obj.properties} - set(adapter.system_columns()))
     if extra and obj.properties:
         results.append(CheckResult(f"{obj.name}.no_extra_columns", "schema", obj.name, None, "warning",
                                    "no columns outside the contract", ", ".join(extra), WARNING,
@@ -137,9 +131,8 @@ def _schema_checks(adapter: Adapter, obj: SchemaObject) -> tuple[list[CheckResul
 def _run_check(adapter: Adapter, check: Check, row_count: int | None) -> CheckResult:
     expected = describe_expectation(check.comparator, check.threshold, check.unit)
     try:
-        value = adapter.scalar(check.sql or "", check.params or None)
-        value = 0 if value is None else value
-        actual_num = float(value)
+        value = adapter.evaluate(check)
+        actual_num = float(0 if value is None else value)
         if check.unit == "percent":
             actual_num = (actual_num * 100.0 / row_count) if row_count else 0.0
         ok = compare(check.comparator, actual_num, check.threshold)
@@ -147,31 +140,21 @@ def _run_check(adapter: Adapter, check: Check, row_count: int | None) -> CheckRe
         status = PASSED if ok else (WARNING if check.severity == "warning" else FAILED)
         return CheckResult(check.check_id, check.check_type, check.object_name, check.column, check.severity,
                            expected, actual, status, check.description, check.sql)
+    except UnsupportedCheck as exc:
+        return CheckResult(check.check_id, check.check_type, check.object_name, check.column, check.severity,
+                           expected, None, SKIPPED, str(exc), check.sql)
     except Exception as exc:  # noqa: BLE001 - a broken check is recorded, not raised
+        adapter._rollback()
         return CheckResult(check.check_id, check.check_type, check.object_name, check.column, check.severity,
                            expected, None, ERROR, f"check could not run: {exc}", check.sql)
 
 
 def _overall(statuses: list[str]) -> str:
-    if any(s in (FAILED, ERROR) for s in statuses):
+    if any(s in (FAILED, ERROR, "fail") for s in statuses):
         return "fail"
-    if any(s == WARNING for s in statuses):
+    if any(s in (WARNING, "warn") for s in statuses):
         return "warn"
     return "pass"
-
-
-def _register_contract(adapter: Adapter, schema: str, contract: Contract) -> None:
-    t = table_name(adapter, schema, "contracts")
-    p = adapter.placeholder
-    exists = adapter.scalar(
-        f"SELECT COUNT(*) FROM {t} WHERE contract_id = {p} AND contract_version = {p} AND yaml_hash = {p}",
-        (contract.id, contract.version, contract.yaml_hash))
-    if not exists:
-        adapter.insert(t, {
-            "contract_id": contract.id, "contract_version": contract.version, "name": contract.name,
-            "domain": contract.domain, "owner": contract.owner, "yaml_hash": contract.yaml_hash,
-            "source_path": contract.path, "loaded_at": utcnow(),
-        })
 
 
 def run_object(adapter: Adapter, obj: SchemaObject, where: str | None = None) -> ObjectRun:
@@ -183,10 +166,11 @@ def run_object(adapter: Adapter, obj: SchemaObject, where: str | None = None) ->
     error: str | None = None
     if not table_missing:
         try:
-            row_count = int(adapter.scalar(f"SELECT COUNT(*) FROM {relation(adapter, obj.physical_name, where)}"))
+            row_count = adapter.count(obj.physical_name, where)
         except Exception as exc:  # noqa: BLE001
+            adapter._rollback()
             error = f"could not count rows: {exc}"
-        for check in build_checks(adapter, obj, where):
+        for check in build_checks(obj, where):
             if check.column and check.column.lower() in missing:
                 results.append(CheckResult(check.check_id, check.check_type, obj.name, check.column,
                                            check.severity, describe_expectation(check.comparator, check.threshold),
@@ -194,21 +178,29 @@ def run_object(adapter: Adapter, obj: SchemaObject, where: str | None = None) ->
                 continue
             results.append(_run_check(adapter, check, row_count))
     statuses = [r.status for r in results] + ([ERROR] if error else [])
-    return ObjectRun(run_id, obj.name, obj.physical_name, _overall(statuses), row_count, results,
-                     started, utcnow(), error)
+    return ObjectRun(run_id, obj.name, obj.physical_name, _overall(statuses), row_count, results, started,
+                     utcnow(), error)
 
 
-def _log_object(adapter: Adapter, schema: str, contract: Contract, run: ObjectRun, batch_id: str | None,
+def _register_contract(meta: Adapter, schema: str, contract: Contract) -> None:
+    key = {"contract_id": contract.id, "contract_version": contract.version, "yaml_hash": contract.yaml_hash}
+    if not meta.meta_count(schema, "contracts", key):
+        meta.meta_insert(schema, "contracts", [{
+            **key, "name": contract.name, "domain": contract.domain, "owner": contract.owner,
+            "source_path": contract.path, "loaded_at": utcnow()}])
+
+
+def _log_object(meta: Adapter, schema: str, contract: Contract, run: ObjectRun, batch_id: str | None,
                 pipeline: str | None, stage: str | None) -> None:
-    adapter.insert(table_name(adapter, schema, "validation_runs"), {
+    meta.meta_insert(schema, "validation_runs", [{
         "run_id": run.run_id, "contract_id": contract.id, "contract_version": contract.version,
         "object_name": run.object_name, "batch_id": batch_id, "pipeline": pipeline, "stage": stage,
         "started_at": run.started_at, "finished_at": run.finished_at, "status": run.status,
         "checks_total": len(run.results), "checks_failed": len(run.failed), "checks_warned": len(run.warned),
         "rows_checked": run.rows_checked, "error_message": run.error,
-    })
+    }])
     now = utcnow()
-    adapter.insert_many(table_name(adapter, schema, "check_results"), [
+    meta.meta_insert(schema, "check_results", [
         {"run_id": run.run_id, "check_id": r.check_id, "check_type": r.check_type, "object_name": r.object_name,
          "column_name": r.column, "severity": r.severity, "expected": r.expected, "actual": r.actual,
          "status": r.status, "message": r.message, "query_text": r.query, "created_at": now}
@@ -216,10 +208,10 @@ def _log_object(adapter: Adapter, schema: str, contract: Contract, run: ObjectRu
     ])
 
 
-def log_notifications(adapter: Adapter, schema: str, run_id: str, run_kind: str,
+def log_notifications(meta: Adapter, schema: str, run_id: str, run_kind: str,
                       deliveries: list[notify.Delivery], subject: str) -> None:
     now = utcnow()
-    adapter.insert_many(table_name(adapter, schema, "notifications"), [
+    meta.meta_insert(schema, "notifications", [
         {"run_id": run_id, "run_kind": run_kind, "channel": d.recipient.channel,
          "recipient": notify.mask(d.recipient.target), "audience": d.recipient.audience, "status": d.status,
          "message": subject if d.status == "sent" else f"{subject} | error: {d.error}", "sent_at": now}
@@ -230,54 +222,46 @@ def log_notifications(adapter: Adapter, schema: str, run_id: str, run_kind: str,
 def run_contract(contract: Contract, adapter: Adapter, config: Config | None = None, *,
                  batch_id: str | None = None, where: str | None = None, objects: list[str] | None = None,
                  pipeline: str | None = None, stage: str | None = None, stage_order: int | None = None,
-                 send_notifications: bool = True) -> RunResult:
-    """Validate a batch (or a whole table) against the contract and log everything in meta tables.
+                 send_notifications: bool = True, meta: Adapter | None = None) -> RunResult:
+    """Validate a batch (or a whole table) against the contract and log everything in the meta tables.
 
-    `where` limits the check to one batch or micro-batch, e.g. "batch_id = '2026-11-26-01'" or an
-    offset/time window for CDC and streaming loads.
+    `where` limits the checks to one batch or micro-batch (SQL filter, or a JSON filter for MongoDB).
+    `meta` is where results are stored; by default the same platform as the data.
     """
     config = config or Config()
     schema = config.meta_schema
+    meta = meta or adapter
     adapter.connect()
-    ensure_meta(adapter, schema)
-    _register_contract(adapter, schema, contract)
+    meta.connect()
+    meta.meta_ensure(schema)
+    _register_contract(meta, schema, contract)
 
     targets = [contract.object(o) for o in objects] if objects else contract.schema
     runs: list[ObjectRun] = []
     for obj in targets:
         run = run_object(adapter, obj, where)
-        _log_object(adapter, schema, contract, run, batch_id, pipeline, stage)
+        _log_object(meta, schema, contract, run, batch_id, pipeline, stage)
         if run.status == "fail" and config.on_fail == "quarantine":
-            reasons = "; ".join(f"{r.check_id}={r.actual}" for r in run.failed)[:4000]
-            adapter.insert(table_name(adapter, schema, "quarantine_log"), {
+            reasons = "; ".join(f"{r.check_id}={r.actual}" for r in run.failed)
+            meta.meta_insert(schema, "quarantine_log", [{
                 "run_id": run.run_id, "contract_id": contract.id, "object_name": run.object_name,
-                "batch_id": batch_id, "reason": reasons, "created_at": utcnow(), "released_at": None,
-            })
+                "batch_id": batch_id, "reason": reasons, "created_at": utcnow(), "released_at": None}])
         if pipeline and stage:
             from .observe import record_event
-            record_event(adapter, schema, pipeline=pipeline, stage=stage, batch_id=batch_id,
+            record_event(meta, schema, pipeline=pipeline, stage=stage, batch_id=batch_id,
                          object_name=run.physical_name, row_count=run.rows_checked, status=run.status,
                          stage_order=stage_order, details=f"contract {contract.id} v{contract.version}")
         runs.append(run)
 
-    result = RunResult(contract.id, contract.version, batch_id, _overall_status(runs), runs)
+    result = RunResult(contract.id, contract.version, batch_id, _overall([r.status for r in runs]), runs)
 
     if send_notifications and result.status in config.notify_on:
         recips = notify.recipients(contract.contacts, config.platform_team)
         if recips:
-            subject = f"[odcr] {result.status.upper()}: contract {contract.id} v{contract.version}" + \
-                      (f" batch {batch_id}" if batch_id else "")
+            subject = (f"[odcr] {result.status.upper()}: contract {contract.id} v{contract.version}"
+                       + (f" batch {batch_id}" if batch_id else ""))
             result.notifications = notify.send(recips, subject, result.summary(), result.to_dict(),
-                                               config.notifications.get("smtp"))
-            log_notifications(adapter, schema, runs[0].run_id if runs else "-", "contract",
-                              result.notifications, subject)
+                                               config.notifications)
+            log_notifications(meta, schema, runs[0].run_id if runs else "-", "contract", result.notifications,
+                              subject)
     return result
-
-
-def _overall_status(runs: list[ObjectRun]) -> str:
-    statuses = [r.status for r in runs]
-    if "fail" in statuses:
-        return "fail"
-    if "warn" in statuses:
-        return "warn"
-    return "pass"

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://sulfibashy.github.io/odcr/
+    about: Installation, adapters, integrations and security
+  - name: Questions and ideas
+    url: https://github.com/sulfibashy/odcr/discussions
+    about: Ask and share in Discussions

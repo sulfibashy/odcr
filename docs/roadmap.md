@@ -1,10 +1,11 @@
 # Roadmap
 
-| Phase | Version | Scope | Gate |
-| --- | --- | --- | --- |
-| 0 | v0.1 (now) | Contract checks, quarantine, notifications, meta tables, reconciliation, tracing; PostgreSQL and MySQL tested | Team formed |
-| 1 | v0.2 | SQL Server tested in CI; Databricks SQL / Unity Catalog adapter; Snowflake adapter | End-to-end demo on Databricks |
-| 2 | v0.5 | Airflow operator, dbt post-hook, GitHub Action; regex `pattern` and freshness checks; Kafka / Event Hub helpers | 3 teams using it |
-| 3 | v1.0 | Stable API, contract registry views, breaking-change detection between contract versions | v1.0 release |
+| Version | Scope |
+| --- | --- |
+| 0.1 | Contract checks, quarantine, notifications, meta tables, reconciliation, tracing (PostgreSQL, MySQL) |
+| **0.2 (now)** | 18 adapters, files in ADLS / S3 / GCS, `odcr init` projects, contract repository from Git, `odcr watch`, 9 notification channels, Airflow operators |
+| 0.3 | ClickHouse, SAP HANA, Teradata, Vertica, Elasticsearch adapters; regex `pattern` and freshness / SLA checks |
+| 0.4 | Native Kafka / Event Hub consumers for in-flight checks; contract version diff and breaking-change detection |
+| 1.0 | Stable API; registry views and dashboards over the meta tables |
 
-Want to own one of these? Open an issue and say so.
+Want to own one of these? Open an issue.

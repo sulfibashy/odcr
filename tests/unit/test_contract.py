@@ -1,11 +1,9 @@
-from pathlib import Path
-
 import pytest
 import yaml
 
+from odcr.adapters import resolve
 from odcr.contract import ContractError, load_contract, parse_contract
-
-TEMPLATE = Path(__file__).parents[2] / "src" / "odcr" / "templates" / "contract.odcs.yaml"
+from odcr.scaffold import contract_yaml
 
 
 def base_doc(**overrides):
@@ -15,15 +13,13 @@ def base_doc(**overrides):
     return doc
 
 
-def test_template_loads():
-    c = load_contract(TEMPLATE)
-    assert c.id == "orders" and c.version == "1.0.0"
-    assert c.owner == "order-team-lead"
-    obj = c.object("orders")
-    assert [p.name for p in obj.properties] == ["order_id", "customer_id", "status", "amount", "order_date"]
-    assert obj.properties[0].primary_key
-    assert {r.metric for r in obj.quality if r.type == "library"} == {"rowCount"}
-    assert any(r.type == "sql" for r in obj.quality)
+@pytest.mark.parametrize("adapter", ["postgres", "mongodb", "cosmosdb", "files"])
+def test_generated_contract_loads(adapter):
+    c = parse_contract(yaml.safe_load(contract_yaml(resolve(adapter))))
+    assert c.id == "orders" and c.owner == "order-team-lead"
+    assert [p.name for p in c.schema[0].properties][:2] == ["order_id", "customer_id"]
+    kinds = {r.type for r in c.schema[0].quality}
+    assert kinds == ({"library", "custom"} if adapter in ("mongodb", "cosmosdb") else {"library", "sql"})
 
 
 def test_hash_changes_with_content(tmp_path):
@@ -53,10 +49,7 @@ def test_rejects_non_v3_and_wrong_kind():
 def test_odcs_30_rule_aliases_and_default_comparator():
     doc = base_doc()
     doc["schema"][0]["properties"][0]["quality"] = [
-        {"rule": "nullCheck"},
-        {"rule": "duplicateCount", "mustBeLessThan": 2},
-        {"rule": "validValues", "validValues": [1, 2]},
-    ]
+        {"rule": "nullCheck"}, {"rule": "duplicateCount", "mustBeLessThan": 2}, {"rule": "validValues", "validValues": [1, 2]}]
     rules = parse_contract(doc).schema[0].properties[0].quality
     assert [r.metric for r in rules] == ["nullValues", "duplicateValues", "invalidValues"]
     assert (rules[0].comparator, rules[0].threshold) == ("mustBe", 0)
@@ -72,6 +65,7 @@ def test_odcs_30_rule_aliases_and_default_comparator():
     ({"type": "weird"}, "unknown quality type"),
     ({"type": "library", "metric": "rowCount"}, "rowCount needs a comparator"),
     ({"type": "library", "metric": "nullValues", "mustBeBetween": 3}, "list of two numbers"),
+    ({"type": "custom", "engine": "mongodb"}, "needs 'implementation'"),
 ])
 def test_invalid_quality_rules(rule, problem):
     doc = base_doc()
@@ -79,6 +73,15 @@ def test_invalid_quality_rules(rule, problem):
     with pytest.raises(ContractError) as exc:
         parse_contract(doc)
     assert any(problem in p for p in exc.value.problems), exc.value.problems
+
+
+def test_custom_rule_defaults():
+    doc = base_doc()
+    doc["schema"][0]["quality"] = [{"type": "custom", "engine": "MongoDB", "implementation": '{"a": 1}'},
+                                   {"type": "custom", "description": "documented only"}]
+    r = parse_contract(doc).schema[0].quality
+    assert (r[0].engine, r[0].comparator, r[0].threshold) == ("mongodb", "mustBe", 0)
+    assert r[1].engine is None and r[1].comparator is None
 
 
 @pytest.mark.parametrize("value,expected", [("warning", "warning"), ("warn", "warning"), ("info", "warning"),
@@ -92,17 +95,24 @@ def test_severity_mapping(value, expected):
     assert parse_contract(doc).schema[0].properties[0].quality[0].severity == expected
 
 
-def test_support_contacts_with_env_interpolation(monkeypatch):
+def test_support_channels(monkeypatch):
     monkeypatch.setenv("SRC_HOOK", "https://hooks.example.com/abc")
     doc = base_doc(support=[
         {"channel": "#a", "tool": "slack", "url": "${SRC_HOOK}"},
-        {"channel": "#b", "tool": "teams", "url": "${UNSET_HOOK}"},          # empty -> skipped
+        {"channel": "#b", "tool": "teams", "url": "${UNSET_HOOK_X}"},  # empty -> skipped
+        {"channel": "t", "tool": "MSTeams", "url": "https://teams.example/hook"},
         {"channel": "team@example.com", "tool": "email"},
-        {"channel": "x", "tool": "email", "url": "mailto:x@example.com"},
+        {"channel": "x", "tool": "mail", "url": "mailto:x@example.com"},
+        {"channel": "g", "tool": "google_chat", "url": "https://chat.example/hook"},
+        {"channel": "pd", "tool": "pagerduty", "url": "routingkey123"},
+        {"channel": "o", "tool": "opsgenie", "url": "geniekey123"},
+        {"channel": "d", "tool": "discord", "url": "https://discord.example/hook"},
+        {"channel": "j", "tool": "jira", "url": "https://jira.example"},  # unknown tool -> ignored
     ])
-    contacts = parse_contract(doc).contacts
-    assert [(c.kind, c.target) for c in contacts] == [
-        ("slack", "https://hooks.example.com/abc"), ("email", "team@example.com"), ("email", "x@example.com")]
+    assert [(c.kind, c.target) for c in parse_contract(doc).contacts] == [
+        ("slack", "https://hooks.example.com/abc"), ("teams", "https://teams.example/hook"),
+        ("email", "team@example.com"), ("email", "x@example.com"), ("googlechat", "https://chat.example/hook"),
+        ("pagerduty", "routingkey123"), ("opsgenie", "geniekey123"), ("discord", "https://discord.example/hook")]
 
 
 def test_missing_file_and_bad_yaml(tmp_path):

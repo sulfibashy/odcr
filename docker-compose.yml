@@ -1,34 +1,35 @@
-# Local databases for development and the end-to-end tests.
-#   docker compose up -d postgres mysql        # SQL Server too: docker compose up -d
+# Local databases for development and the end-to-end tests:
+#   docker compose up -d            # everything
+#   docker compose up -d postgres mysql
 #   pytest
+# Environment for pytest (already the defaults, except the ones marked *):
+#   ODCR_PG_HOST=localhost ODCR_MYSQL_HOST=127.0.0.1 ODCR_MARIADB_HOST=127.0.0.1* ODCR_MSSQL_HOST=localhost*
+#   ODCR_ORACLE_HOST=localhost* ODCR_TRINO_HOST=localhost* ODCR_MONGO_URI=mongodb://localhost:27017*
 services:
   postgres:
     image: postgres:16
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: odcr_test
+    environment: {POSTGRES_PASSWORD: postgres, POSTGRES_DB: odcr_test}
     ports: ["5432:5432"]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      retries: 20
-
   mysql:
     image: mysql:8.4
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: odcr_test
-      MYSQL_USER: odcr
-      MYSQL_PASSWORD: odcr
+    environment: {MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: odcr_test, MYSQL_USER: odcr, MYSQL_PASSWORD: odcr}
     ports: ["3306:3306"]
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
-      interval: 5s
-      retries: 30
-
+  mariadb:
+    image: mariadb:11
+    environment: {MARIADB_ROOT_PASSWORD: root, MARIADB_DATABASE: odcr_test, MARIADB_USER: odcr, MARIADB_PASSWORD: odcr}
+    ports: ["3307:3306"]
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "Odcr_Passw0rd!"
+    environment: {ACCEPT_EULA: "Y", MSSQL_SA_PASSWORD: "Odcr_Passw0rd!"}
     ports: ["1433:1433"]
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    environment: {ORACLE_PASSWORD: odcr, APP_USER: odcr, APP_USER_PASSWORD: odcr}
+    ports: ["1521:1521"]
+  trino:
+    image: trinodb/trino:latest
+    ports: ["8080:8080"]
+    volumes: ["./ci/trino/memory.properties:/etc/trino/catalog/memory.properties:ro"]
+  mongodb:
+    image: mongo:7
+    ports: ["27017:27017"]

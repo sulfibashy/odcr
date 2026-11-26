@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use odcr, please cite it as below."
+title: "odcr: Open Data Contract Runtime"
+type: software
+authors:
+  - alias: sulfibashy
+repository-code: "https://github.com/sulfibashy/odcr"
+license: Apache-2.0
+version: 0.2.0
+keywords: [data contracts, ODCS, data quality, data observability]

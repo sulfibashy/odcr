@@ -1,36 +1,32 @@
-"""Turn a contract's schema object into executable checks (portable SQL)."""
+"""Turn a contract's schema object into checks. Adapters decide how each check runs on their platform."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
-from .adapters.base import Adapter
 from .contract import Property, QualityRule, SchemaObject
 
 
 @dataclass
 class Check:
     check_id: str
-    check_type: str  # schema | quality | sql
+    check_type: str  # quality | sql | custom
     object_name: str
+    physical_name: str
     column: str | None
     severity: str
+    where: str | None = None
     metric: str | None = None
-    sql: str | None = None
-    params: list[Any] = field(default_factory=list)
+    args: dict[str, Any] = field(default_factory=dict)
+    query: str | None = None  # sql rules and custom rules (implementation)
+    engine: str | None = None  # custom rules: sql, mongodb, cosmosdb, ...
     comparator: str | None = None
     threshold: Any = None
     unit: str = "rows"
     description: str = ""
-
-
-def relation(adapter: Adapter, physical_name: str, where: str | None = None) -> str:
-    """The rows under test: the whole table, or one batch/micro-batch when `where` is given."""
-    table = adapter.qualify(physical_name)
-    if where:
-        return f"(SELECT * FROM {table} WHERE {where}) src"
-    return f"{table} src"
+    sql: str | None = None  # the query that actually ran (set by the adapter)
+    params: list[Any] = field(default_factory=list)
 
 
 def compare(comparator: str | None, actual: Any, threshold: Any) -> bool:
@@ -73,87 +69,42 @@ def describe_expectation(comparator: str | None, threshold: Any, unit: str = "ro
     return f"{words[comparator]} {threshold}{suffix}"
 
 
-def _metric_sql(adapter: Adapter, metric: str, rel: str, column: str | None,
-                args: dict[str, Any]) -> tuple[str, list[Any]]:
-    q = adapter.quote
-    if metric == "rowCount":
-        return f"SELECT COUNT(*) FROM {rel}", []
-    if metric == "nullValues":
-        return f"SELECT COUNT(*) FROM {rel} WHERE {q(column)} IS NULL", []  # type: ignore[arg-type]
-    if metric == "missingValues":
-        missing = [m for m in args.get("missingValues", []) if m is not None]
-        if missing:
-            return (f"SELECT COUNT(*) FROM {rel} WHERE {q(column)} IS NULL OR {q(column)} IN "  # type: ignore
-                    f"({adapter.params(len(missing))})", missing)
-        return f"SELECT COUNT(*) FROM {rel} WHERE {q(column)} IS NULL", []  # type: ignore[arg-type]
-    if metric == "duplicateValues":
-        cols = [column] if column else list(args.get("properties", []))
-        if not cols:
-            raise ValueError("duplicateValues on an object needs arguments.properties")
-        group = ", ".join(q(c) for c in cols)
-        not_null = " AND ".join(f"{q(c)} IS NOT NULL" for c in cols)
-        return (f"SELECT COALESCE(SUM(c - 1), 0) FROM (SELECT COUNT(*) AS c FROM {rel} WHERE {not_null} "
-                f"GROUP BY {group} HAVING COUNT(*) > 1) d", [])
-    if metric == "invalidValues":
-        valid = list(args.get("validValues", []))
-        return (f"SELECT COUNT(*) FROM {rel} WHERE {q(column)} IS NOT NULL AND {q(column)} NOT IN "  # type: ignore
-                f"({adapter.params(len(valid))})", valid)
-    raise ValueError(f"Unsupported metric {metric}")
-
-
-def _render_sql(query: str, rel: str, adapter: Adapter, column: str | None) -> str:
-    out = query
-    for token in ("${object}", "{object}", "${table}", "{table}"):
-        out = out.replace(token, rel)
-    if column:
-        for token in ("${property}", "{property}", "${column}", "{column}"):
-            out = out.replace(token, adapter.quote(column))
-    return out
-
-
-def _quality_checks(adapter: Adapter, obj: SchemaObject, rel: str, rules: list[QualityRule],
-                    prop: Property | None) -> list[Check]:
+def _rule_checks(obj: SchemaObject, rules: list[QualityRule], prop: Property | None,
+                 where: str | None) -> list[Check]:
     checks: list[Check] = []
     col = prop.name if prop else None
     base = f"{obj.name}.{col}" if col else obj.name
     for i, rule in enumerate(rules):
-        if rule.type not in ("library", "sql"):
-            continue
         if rule.type == "library":
-            sql, params = _metric_sql(adapter, rule.metric or "", rel, col, rule.arguments)
-            cid = rule.name or f"{base}.{rule.metric}"
-            ctype = "quality"
+            cid, ctype = rule.name or f"{base}.{rule.metric}", "quality"
+        elif rule.type == "sql":
+            cid, ctype = rule.name or f"{base}.sql_{i + 1}", "sql"
+        elif rule.type == "custom" and rule.engine and rule.implementation is not None:
+            cid, ctype = rule.name or f"{base}.custom_{i + 1}", "custom"
         else:
-            sql, params = _render_sql(rule.query or "", rel, adapter, col), []
-            cid = rule.name or f"{base}.sql_{i + 1}"
-            ctype = "sql"
+            continue  # text rules and custom rules without an engine are documentation only
         checks.append(Check(
-            check_id=cid, check_type=ctype, object_name=obj.name, column=col, severity=rule.severity,
-            metric=rule.metric, sql=sql, params=params, comparator=rule.comparator,
+            check_id=cid, check_type=ctype, object_name=obj.name, physical_name=obj.physical_name, column=col,
+            severity=rule.severity, where=where, metric=rule.metric if rule.type == "library" else None,
+            args=rule.arguments, query=rule.query if rule.type == "sql" else rule.implementation,
+            engine=rule.engine if rule.type == "custom" else None, comparator=rule.comparator,
             threshold=rule.threshold, unit=rule.unit, description=rule.description or "",
         ))
     return checks
 
 
-def build_checks(adapter: Adapter, obj: SchemaObject, where: str | None = None) -> list[Check]:
-    """Data checks for one schema object (schema checks are run separately against live metadata)."""
-    rel = relation(adapter, obj.physical_name, where)
+def build_checks(obj: SchemaObject, where: str | None = None) -> list[Check]:
+    """Data checks for one schema object. Schema checks run separately against the live catalog."""
     checks: list[Check] = []
     for prop in obj.properties:
+        common = dict(object_name=obj.name, physical_name=obj.physical_name, column=prop.name, severity="error",
+                      where=where, comparator="mustBe", threshold=0)
         if prop.required or prop.primary_key:
-            checks.append(Check(
-                check_id=f"{obj.name}.{prop.name}.required", check_type="quality", object_name=obj.name,
-                column=prop.name, severity="error", metric="nullValues",
-                sql=_metric_sql(adapter, "nullValues", rel, prop.name, {})[0],
-                comparator="mustBe", threshold=0, description="required: no NULL values",
-            ))
+            checks.append(Check(check_id=f"{obj.name}.{prop.name}.required", check_type="quality",
+                                metric="nullValues", description="required: no NULL values", **common))
         if prop.unique or prop.primary_key:
-            checks.append(Check(
-                check_id=f"{obj.name}.{prop.name}.unique", check_type="quality", object_name=obj.name,
-                column=prop.name, severity="error", metric="duplicateValues",
-                sql=_metric_sql(adapter, "duplicateValues", rel, prop.name, {})[0],
-                comparator="mustBe", threshold=0, description="unique: no duplicate values",
-            ))
-        checks.extend(_quality_checks(adapter, obj, rel, prop.quality, prop))
-    checks.extend(_quality_checks(adapter, obj, rel, obj.quality, None))
+            checks.append(Check(check_id=f"{obj.name}.{prop.name}.unique", check_type="quality",
+                                metric="duplicateValues", description="unique: no duplicate values", **common))
+        checks.extend(_rule_checks(obj, prop.quality, prop, where))
+    checks.extend(_rule_checks(obj, obj.quality, None, where))
     return checks

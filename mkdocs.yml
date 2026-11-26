@@ -1,0 +1,76 @@
+site_name: odcr — Open Data Contract Runtime
+site_description: Enforce ODCS data contracts where data lands, on any database, lake or cloud.
+site_url: https://sulfibashy.github.io/odcr/
+repo_url: https://github.com/sulfibashy/odcr
+repo_name: sulfibashy/odcr
+edit_uri: edit/main/docs/
+copyright: Apache License 2.0
+theme:
+  name: material
+  features: [navigation.sections, navigation.top, navigation.instant, search.suggest, content.code.copy, content.tabs.link]
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - scheme: slate
+      primary: indigo
+      toggle: {icon: material/weather-sunny, name: Light mode}
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed: {alternate_style: true}
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Project structure: getting-started/project-structure.md
+  - Concepts:
+      - Contract repository: concepts/contract-repository.md
+      - What odcr checks: concepts/contracts.md
+      - When data lands: concepts/when-data-lands.md
+      - Reconciliation: concepts/reconciliation.md
+      - Observability: concepts/observability.md
+      - Notifications: concepts/notifications.md
+  - Adapters:
+      - Overview: adapters/index.md
+      - DuckDB: adapters/duckdb.md
+      - "Files: ADLS, S3, GCS, local": adapters/files.md
+      - SQLite: adapters/sqlite.md
+      - PostgreSQL: adapters/postgres.md
+      - MySQL / MariaDB: adapters/mysql.md
+      - SQL Server / Azure SQL: adapters/sqlserver.md
+      - Azure Synapse: adapters/synapse.md
+      - Fabric Warehouse: adapters/fabric.md
+      - Oracle: adapters/oracle.md
+      - IBM Db2: adapters/db2.md
+      - Trino / Starburst: adapters/trino.md
+      - Snowflake: adapters/snowflake.md
+      - Databricks: adapters/databricks.md
+      - BigQuery: adapters/bigquery.md
+      - Redshift: adapters/redshift.md
+      - Athena: adapters/athena.md
+      - MongoDB: adapters/mongodb.md
+      - Cosmos DB: adapters/cosmosdb.md
+  - Integrations:
+      - Overview: integrations/index.md
+      - Airflow: integrations/airflow.md
+      - Informatica: integrations/informatica.md
+      - Ab Initio: integrations/abinitio.md
+      - Azure Data Factory: integrations/azure-data-factory.md
+      - Databricks: integrations/databricks.md
+      - Schedulers, SSIS, dbt: integrations/schedulers.md
+      - CI/CD: integrations/ci-cd.md
+  - Security: security.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Python API: reference/python-api.md
+      - Meta tables: reference/meta-tables.md
+  - Contributing:
+      - Development: contributing/development.md
+      - Adding an adapter: contributing/adding-an-adapter.md
+  - Roadmap: roadmap.md

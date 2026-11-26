@@ -4,48 +4,183 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12"}
+      - run: pip install ruff
+      - run: ruff check src tests scripts
+
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.12", "3.13"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.13"]
+        include:
+          - {os: ubuntu-latest, python: "3.11"}
+          - {os: ubuntu-latest, python: "3.12"}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: "${{ matrix.python }}"}
+      - run: pip install -e ".[dev]"
+      # DuckDB, SQLite, local files and MongoDB (in-memory) on every operating system
+      - run: pytest -q
+
+  e2e:
+    name: end-to-end (servers)
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: odcr_test
+        env: {POSTGRES_PASSWORD: postgres, POSTGRES_DB: odcr_test}
         ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 30
       mysql:
         image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: odcr_test
-          MYSQL_USER: odcr
-          MYSQL_PASSWORD: odcr
+        env: {MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: odcr_test, MYSQL_USER: odcr, MYSQL_PASSWORD: odcr}
         ports: ["3306:3306"]
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot" --health-interval 5s --health-retries 30
+        options: --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot" --health-interval 5s --health-retries 40
+      mariadb:
+        image: mariadb:11
+        env: {MARIADB_ROOT_PASSWORD: root, MARIADB_DATABASE: odcr_test, MARIADB_USER: odcr, MARIADB_PASSWORD: odcr}
+        ports: ["3307:3306"]
+        options: --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-retries 40
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env: {ACCEPT_EULA: "Y", MSSQL_SA_PASSWORD: "Odcr_Passw0rd!"}
+        ports: ["1433:1433"]
+      oracle:
+        image: gvenzl/oracle-free:23-slim-faststart
+        env: {ORACLE_PASSWORD: odcr, APP_USER: odcr, APP_USER_PASSWORD: odcr}
+        ports: ["1521:1521"]
+        options: --health-cmd healthcheck.sh --health-interval 10s --health-retries 60
+      trino:
+        image: trinodb/trino:latest
+        ports: ["8080:8080"]
+      mongodb:
+        image: mongo:7
+        ports: ["27017:27017"]
+        options: --health-cmd "mongosh --quiet --eval 'db.runCommand({ping: 1})'" --health-interval 5s --health-retries 30
+    env:
+      ODCR_PG_HOST: localhost
+      ODCR_MYSQL_HOST: 127.0.0.1
+      ODCR_MARIADB_HOST: 127.0.0.1
+      ODCR_MARIADB_PORT: "3307"
+      ODCR_MSSQL_HOST: localhost
+      ODCR_MSSQL_CLIENT: pytds
+      ODCR_ORACLE_HOST: localhost
+      ODCR_TRINO_HOST: localhost
+      ODCR_MONGO_URI: mongodb://localhost:27017
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Grant the test user rights to create meta schemas
-        run: mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL ON *.* TO 'odcr'@'%'; FLUSH PRIVILEGES;"
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12"}
       - run: pip install -e ".[dev]"
-      - run: pytest -v
-      - name: Build package
+      - name: Let the test users create meta schemas
         run: |
-          pip install build
-          python -m build
-      - uses: actions/upload-artifact@v4
-        if: matrix.python == '3.13'
-        with:
-          name: dist
-          path: dist/
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "GRANT ALL ON *.* TO 'odcr'@'%'; FLUSH PRIVILEGES;"
+          mysql -h 127.0.0.1 -P 3307 -uroot -proot -e "GRANT ALL ON *.* TO 'odcr'@'%'; FLUSH PRIVILEGES;"
+      - name: Wait for SQL Server and Trino
+        run: |
+          python - <<'PY'
+          import time, urllib.request, json
+          import pytds
+          for i in range(60):
+              try:
+                  pytds.connect(server="localhost", user="sa", password="Odcr_Passw0rd!", database="master").close()
+                  break
+              except Exception:
+                  time.sleep(3)
+          for i in range(60):
+              try:
+                  if not json.load(urllib.request.urlopen("http://localhost:8080/v1/info"))["starting"]:
+                      break
+              except Exception:
+                  pass
+              time.sleep(3)
+          PY
+      - name: Tests against every server
+        run: pytest -v -rs --cov=odcr --cov-report=term --cov-report=xml
+      - uses: actions/upload-artifact@v7
+        with: {name: coverage, path: coverage.xml}
+
+  cloud:
+    name: end-to-end (cloud, with credentials)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      ODCR_TEST_SNOWFLAKE: ${{ secrets.ODCR_TEST_SNOWFLAKE }}
+      ODCR_TEST_DATABRICKS: ${{ secrets.ODCR_TEST_DATABRICKS }}
+      ODCR_TEST_BIGQUERY: ${{ secrets.ODCR_TEST_BIGQUERY }}
+      ODCR_TEST_REDSHIFT: ${{ secrets.ODCR_TEST_REDSHIFT }}
+      ODCR_TEST_ATHENA: ${{ secrets.ODCR_TEST_ATHENA }}
+      ODCR_TEST_SYNAPSE: ${{ secrets.ODCR_TEST_SYNAPSE }}
+      ODCR_TEST_FABRIC: ${{ secrets.ODCR_TEST_FABRIC }}
+      ODCR_TEST_COSMOSDB: ${{ secrets.ODCR_TEST_COSMOSDB }}
+      ODCR_TEST_DB2: ${{ secrets.ODCR_TEST_DB2 }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12"}
+      - run: pip install -e ".[all,dev]"
+      # Each cloud target runs only when its secret is set; otherwise it is reported as skipped.
+      - run: pytest tests/e2e -v -rs
+
+  package:
+    name: package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12"}
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - name: Install the wheel in a clean environment and run the quickstart
+        shell: bash
+        run: |
+          python -m venv /tmp/venv || python -m venv venv
+          if [ -d /tmp/venv/bin ]; then BIN=/tmp/venv/bin; elif [ -d venv/Scripts ]; then BIN=venv/Scripts; else BIN=/tmp/venv/Scripts; fi
+          "$BIN/pip" install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$BIN/odcr" --version
+          "$BIN/odcr" init demo --adapter sqlite --no-input --alerts none
+          cd demo
+          "$BIN/odcr" doctor
+          "$BIN/odcr" seed
+          "$BIN/odcr" run --contract-id orders --batch-id batch-001 --where "load_id = 'batch-001'" --no-notify
+          if "$BIN/odcr" run --contract-id orders --batch-id batch-002 --where "load_id = 'batch-002'" --no-notify; then
+            echo "batch-002 should fail"; exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        if: matrix.os == 'ubuntu-latest'
+        with: {name: dist, path: dist/}
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12"}
+      - run: pip install -e ".[docs]"
+      - run: mkdocs build --strict

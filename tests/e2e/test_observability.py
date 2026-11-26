@@ -1,97 +1,92 @@
-"""End-to-end: reconciliation (same platform and cross-platform), stage tracing, streaming micro-batches, CLI."""
+"""End-to-end reconciliation, tracing, streaming micro-batches and watch, on every reachable adapter."""
 
 from __future__ import annotations
 
-import json
+import datetime as dt
+from decimal import Decimal
 
 import pytest
-import yaml
 
+from odcr import samples
 from odcr.adapters import get_adapter
-from odcr.cli import main
+from odcr.config import Config
 from odcr.contract import parse_contract
-from odcr.meta import table_name as meta_table
 from odcr.observe import checkpoint, trace
 from odcr.reconcile import parse_reconciliation, run_reconciliation
 from odcr.runner import run_contract
-from tests.conftest import GOOD_ROWS, connection_options, contract_doc, create_orders, drop_table, require
+from odcr.watch import watch_once
+from tests.conftest import connection_options, contract_doc, drop, load, object_name, require, where
 
 pytestmark = pytest.mark.e2e
 
 
-def recon_spec(src: str, tgt: str, batch_filter: bool = True) -> dict:
-    where = "load_id = '{batch_id}'" if batch_filter else None
+def recon_spec(src: str, tgt: str, src_where=None, tgt_where=None) -> dict:
     return {"kind": "Reconciliation", "id": "orders-recon",
-            "source": {"object": src, "where": where}, "target": {"object": tgt, "where": where},
+            "source": {"object": src, "where": src_where}, "target": {"object": tgt, "where": tgt_where},
             "checks": [{"type": "rowCount"}, {"type": "sum", "column": "amount", "tolerance": 0.01},
                        {"type": "distinctCount", "column": "customer_id"}, {"type": "max", "column": "order_id"},
                        {"type": "nullCount", "column": "amount"}, {"type": "missingKeys", "column": "order_id"}]}
 
 
 def test_reconcile_same_platform(db, config, webhook):
-    src, tgt = "recon_src_" + db.dialect, "recon_tgt_" + db.dialect
-    create_orders(db, src, GOOD_ROWS)
-    create_orders(db, tgt, GOOD_ROWS)
+    src, tgt, bad = object_name(db), object_name(db), object_name(db)
+    src_p = load(db, src, samples.GOOD)
+    tgt_p = load(db, tgt, samples.GOOD)
+    changed = [samples.GOOD[0][:3] + (Decimal("99.00"),) + samples.GOOD[0][4:]] + samples.GOOD[1:3]  # row 4 lost
+    bad_p = load(db, bad, changed)
     try:
-        recon = parse_reconciliation(recon_spec(src, tgt))
-        ok = run_reconciliation(recon, db, db, config, batch_id="A")
+        ok = run_reconciliation(parse_reconciliation(recon_spec(src_p, tgt_p)), db, db, config, batch_id="A")
         assert ok.status == "pass", ok.summary()
-        # lose one row and change an amount in the target
-        q = db.quote
-        db.execute(f"DELETE FROM {q(tgt)} WHERE {q('order_id')} = 4")
-        db.execute(f"UPDATE {q(tgt)} SET {q('amount')} = 99 WHERE {q('order_id')} = 1")
-        bad = run_reconciliation(recon, db, db, config, batch_id="A")
-        assert bad.status == "fail"
-        res = {r.check_id: r for r in bad.results}
-        assert (res["rowCount"].source_value, res["rowCount"].target_value) == ("4", "3")
-        assert res["sum(amount)"].status == "failed"
-        assert res["max(order_id)"].status == "failed"
-        assert "1 missing in target (e.g. 4)" in res["missingKeys(order_id)"].message
-        assert res["nullCount(amount)"].status == "passed"
-        assert len(webhook.calls) == 1 and webhook.calls[0]["path"] == "/platform"
-        p = db.placeholder
-        assert int(db.scalar(f"SELECT COUNT(*) FROM {meta_table(db, config.meta_schema, 'reconciliation_results')} "
-                             f"WHERE run_id = {p} AND status = 'failed'", [bad.run_id])) == 4
-    finally:
-        drop_table(db, src)
-        drop_table(db, tgt)
-
-
-def test_reconcile_postgres_to_mysql(config, webhook):
-    require("postgres")
-    require("mysql")
-    pg = get_adapter(connection_options("postgres")).connect()
-    my = get_adapter(connection_options("mysql")).connect()
-    try:
-        create_orders(pg, "xrecon_orders", GOOD_ROWS)
-        create_orders(my, "xrecon_orders", GOOD_ROWS)
-        recon = parse_reconciliation(recon_spec("xrecon_orders", "xrecon_orders"))
-        assert run_reconciliation(recon, pg, my, config, batch_id="A").status == "pass"
-        my.execute("DELETE FROM `xrecon_orders` WHERE `order_id` = 2")
-        res = run_reconciliation(recon, pg, my, config, batch_id="A")
+        res = run_reconciliation(parse_reconciliation(recon_spec(src_p, bad_p)), db, db, config, batch_id="A")
         assert res.status == "fail"
-        assert {r.check_id for r in res.results if r.status == "failed"} == {
-            "rowCount", "sum(amount)", "distinctCount(customer_id)", "missingKeys(order_id)"}
-        # results are stored in the target platform (MySQL) by default
-        assert int(my.scalar(f"SELECT COUNT(*) FROM `{config.meta_schema}`.`reconciliation_runs` "
-                             f"WHERE run_id = %s", [res.run_id])) == 1
+        by = {r.check_id: r for r in res.results}
+        assert (by["rowCount"].source_value, by["rowCount"].target_value) == ("4", "3")
+        assert by["sum(amount)"].status == "failed"
+        assert by["max(order_id)"].status == "failed"
+        assert "1 missing in target (e.g. 4)" in by["missingKeys(order_id)"].message
+        assert by["nullCount(amount)"].status == "passed"
+        assert len(webhook.calls) == 1 and webhook.calls[0]["path"] == "/platform"
+        assert db.meta_count(config.meta_schema, "reconciliation_results", {"run_id": res.run_id, "status": "failed"}) == 4
     finally:
-        drop_table(pg, "xrecon_orders")
-        drop_table(my, "xrecon_orders")
-        pg.close()
-        my.close()
+        for n in (src, tgt, bad):
+            drop(db, n)
 
 
-def test_trace_batch_through_stages(db, config, table_name, webhook):
-    """source -> ingestion (contract check) -> silver -> gold; gold loses rows and is flagged."""
-    create_orders(db, table_name, GOOD_ROWS)
+@pytest.mark.parametrize("source,target", [("duckdb", "sqlite"), ("postgres", "mysql"), ("mongodb", "duckdb"),
+                                           ("files", "postgres"), ("sqlserver", "postgres"), ("oracle", "postgres"),
+                                           ("trino", "duckdb")])
+def test_reconcile_across_platforms(source, target, config, session_tmp):
+    s_opts, t_opts = require(source, session_tmp), require(target, session_tmp)
+    s, t = get_adapter(s_opts).connect(), get_adapter(t_opts).connect()
+    s.test_tmp = t.test_tmp = session_tmp
+    s_name, t_name = object_name(s), object_name(t)
     try:
-        pipe = f"orders_pipeline_{table_name}"
+        s_p = load(s, s_name, samples.ROWS)
+        t_p = load(t, t_name, samples.ROWS[:-1])  # the last row never arrived
+        spec = recon_spec(s_p, t_p, where(s, "batch-002"), where(t, "batch-002"))
+        res = run_reconciliation(parse_reconciliation(spec), s, t, config, batch_id="batch-002",
+                                 send_notifications=False)
+        failed = {r.check_id for r in res.results if r.status != "passed"}
+        assert failed == {"rowCount", "sum(amount)", "distinctCount(customer_id)", "max(order_id)",
+                          "missingKeys(order_id)"}, res.summary()
+        assert t.meta_count(config.meta_schema, "reconciliation_runs", {"run_id": res.run_id}) == 1
+    finally:
+        drop(s, s_name)
+        drop(t, t_name)
+        s.close()
+        t.close()
+
+
+def test_trace_batch_through_stages(db, config, webhook):
+    name = object_name(db)
+    phys = load(db, name, samples.GOOD)
+    pipe = f"pipe_{name[-12:]}"
+    try:
         checkpoint(db, pipeline=pipe, stage="source", batch_id="A", row_count=4, config=config)
-        run_contract(parse_contract(contract_doc(table_name, webhook.url)), db, config, batch_id="A",
-                     where="load_id = 'A'", pipeline=pipe, stage="ingestion")
-        checkpoint(db, pipeline=pipe, stage="silver", batch_id="A", object_name=table_name,
-                   where="load_id = 'A'", config=config)
+        run_contract(parse_contract(contract_doc(db, phys, webhook.url)), db, config, batch_id="A",
+                     where=where(db, "batch-001"), pipeline=pipe, stage="ingestion")
+        checkpoint(db, pipeline=pipe, stage="silver", batch_id="A", object_name=phys, where=where(db, "batch-001"),
+                   config=config)
         checkpoint(db, pipeline=pipe, stage="gold", batch_id="A", row_count=3, config=config)
         checkpoint(db, pipeline=pipe, stage="consumption", batch_id="A", row_count=3, config=config)
         steps = trace(db, pipeline=pipe, batch_id="A", config=config)
@@ -99,74 +94,66 @@ def test_trace_batch_through_stages(db, config, table_name, webhook):
         assert [s.row_count for s in steps] == [4, 4, 4, 3, 3]
         assert [s.flag for s in steps] == ["", "", "", "lost 1 rows", ""]
         assert steps[1].status == "pass"
-        assert trace(db, pipeline=pipe, batch_id="A", config=config, tolerance=1)[3].flag == ""
     finally:
-        drop_table(db, table_name)
+        drop(db, name)
 
 
-def test_streaming_microbatches(db, config, table_name, webhook):
-    """Simulate a CDC / Event Hub stream: each micro-batch is checked and checkpointed as it lands."""
-    create_orders(db, table_name, [])
-    contract = parse_contract(contract_doc(table_name, webhook.url))
-    q = db.quote
-    insert = (f"INSERT INTO {q(table_name)} ({', '.join(q(c) for c in ['order_id', 'customer_id', 'status', 'amount', 'order_date', 'load_id'])}) "
-              f"VALUES ({db.params(6)})")
-    batches = {
-        "offset-0-99": [(1, 1, "NEW", 1.0, "2026-11-01", "offset-0-99"), (2, 2, "PAID", 2.0, "2026-11-01", "offset-0-99")],
-        "offset-100-199": [(3, 3, "NEW", 3.0, "2026-11-01", "offset-100-199")],
-        "offset-200-299": [(4, None, "NEW", 4.0, "2026-11-01", "offset-200-299")],  # bad event
+def test_streaming_microbatches_with_watch(db, config):
+    """Micro-batches (CDC / Event Hub / Kafka / file drops) land one after another; each is checked once."""
+    contract_rows = {
+        "offset-0-99": [(1, 1, "NEW", Decimal("1.00"), dt.date(2026, 11, 1), "offset-0-99"),
+                        (2, 2, "PAID", Decimal("2.00"), dt.date(2026, 11, 1), "offset-0-99")],
+        "offset-100-199": [(3, 3, "NEW", Decimal("3.00"), dt.date(2026, 11, 1), "offset-100-199")],
+        "offset-200-299": [(4, None, "NEW", Decimal("4.00"), dt.date(2026, 11, 1), "offset-200-299")],  # bad
     }
+    base = object_name(db)
+    pipeline = f"stream_{base[-10:]}"
+    created: list[str] = []
     try:
-        statuses = {}
-        for batch_id, rows in batches.items():
-            db.executemany(insert, rows)
-            checkpoint(db, pipeline="orders_stream", stage="queue", batch_id=batch_id, row_count=len(rows),
-                       mode="streaming", config=config)
-            res = run_contract(contract, db, config, batch_id=batch_id, where=f"load_id = '{batch_id}'",
-                               pipeline="orders_stream", stage="bronze", send_notifications=False)
-            statuses[batch_id] = res.status
-        assert statuses == {"offset-0-99": "pass", "offset-100-199": "pass", "offset-200-299": "fail"}
-        steps = trace(db, pipeline="orders_stream", batch_id="offset-200-299", config=config)
-        assert [(s.stage, s.mode, s.row_count, s.status) for s in steps] == [
-            ("queue", "streaming", 1, "ok"), ("bronze", "batch", 1, "fail")]
-        assert "stage status fail" in steps[1].flag
+        seen: dict[str, str] = {}
+        accumulated: list = []
+        for i, (_batch, rows) in enumerate(contract_rows.items()):
+            if db.dialect == "files":  # a new file per micro-batch
+                name = base.replace("part-0001", f"part-{i:04d}")
+                phys = load(db, name, rows)
+                created.append(name)
+                kwargs = {}
+            else:  # rows appended to one table; the batch column tells micro-batches apart
+                accumulated += rows
+                phys = load(db, base, accumulated)
+                created = [base]
+                kwargs = {"batch_column": "load_id"}
+            contract = parse_contract(contract_doc(db, phys))
+            events = watch_once(contract, db, config, pipeline=pipeline, send_notifications=False, **kwargs)
+            for e in events:
+                seen[e.batch_id] = e.result.status
+            assert len(events) == 1, [e.batch_id for e in events]  # only the new micro-batch is checked
+        assert sorted(seen.values()) == ["fail", "pass", "pass"]
+        again = watch_once(contract, db, config, pipeline=pipeline, send_notifications=False, **kwargs)
+        assert again == []  # nothing new: nothing checked twice
     finally:
-        drop_table(db, table_name)
+        for n in set(created):
+            drop(db, n)
 
 
-def _write_config(tmp_path, kind, config, webhook):
-    cfg = {"connections": {"db": connection_options(kind)}, "meta": {"schema": config.meta_schema},
-           "notifications": {"notify_on": ["fail"], "platform_team": [{"type": "webhook", "url": webhook.url}]}}
-    path = tmp_path / "odcr.yaml"
-    path.write_text(yaml.safe_dump(cfg))
-    return str(path)
-
-
-def test_cli_end_to_end(db, config, table_name, webhook, tmp_path, capsys):
-    kind = {"postgres": "postgres", "mysql": "mysql", "sqlserver": "sqlserver"}[db.dialect]
-    cfg = _write_config(tmp_path, kind, config, webhook)
-    create_orders(db, table_name, GOOD_ROWS)
-    contract = tmp_path / "orders.odcs.yaml"
-    contract.write_text(yaml.safe_dump(contract_doc(table_name, None)))
+def test_meta_on_another_platform(config, session_tmp):
+    """Read-only sources: data checked on one platform, results stored on another (meta.connection)."""
+    data = get_adapter(require("duckdb", session_tmp)).connect()
+    meta = get_adapter(connection_options("sqlite", session_tmp)).connect()
+    data.test_tmp = session_tmp
+    name = object_name(data)
     try:
-        assert main(["meta-init", "-c", cfg, "-C", "db"]) == 0
-        assert main(["run", str(contract), "-c", cfg, "-C", "db", "--batch-id", "A", "--where", "load_id = 'A'",
-                     "--pipeline", f"p_{table_name}", "--stage", "ingestion"]) == 0
-        capsys.readouterr()
-        db.execute(f"UPDATE {db.quote(table_name)} SET {db.quote('status')} = 'BROKEN'")
-        assert main(["run", str(contract), "-c", cfg, "-C", "db", "--batch-id", "A2", "--json"]) == 1
-        out = json.loads(capsys.readouterr().out)
-        assert out["status"] == "fail" and out["notifications"][0]["status"] == "sent"
-        assert main(["history", "-c", cfg, "-C", "db", "--contract-id", "orders", "--limit", "2", "--json"]) == 0
-        hist = json.loads(capsys.readouterr().out)
-        assert [h["status"] for h in hist] == ["fail", "pass"]
-        assert main(["checkpoint", "-c", cfg, "-C", "db", "--pipeline", f"p_{table_name}", "--stage", "gold",
-                     "--batch-id", "A", "--rows", "2"]) == 0
-        capsys.readouterr()
-        assert main(["trace", "-c", cfg, "-C", "db", "--pipeline", f"p_{table_name}", "--batch-id", "A"]) == 1
-        assert "lost 2 rows" in capsys.readouterr().out
-        spec = tmp_path / "recon.yaml"
-        spec.write_text(yaml.safe_dump(recon_spec(table_name, table_name, batch_filter=False)))
-        assert main(["reconcile", str(spec), "-c", cfg, "--source", "db", "--target", "db"]) == 0
+        phys = load(data, name, samples.GOOD)
+        res = run_contract(parse_contract(contract_doc(data, phys)), data, config, meta=meta, send_notifications=False)
+        assert res.status == "pass"
+        assert meta.meta_count(config.meta_schema, "validation_runs", {"run_id": res.objects[0].run_id}) == 1
     finally:
-        drop_table(db, table_name)
+        drop(data, name)
+        data.close()
+        meta.close()
+
+
+def test_config_type_alias(session_tmp):
+    a = get_adapter({"type": "adls", "meta_path": str(session_tmp / "x.duckdb")})
+    assert a.dialect == "files"
+    assert isinstance(Config().meta_schema, str)

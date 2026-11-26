@@ -1,14 +1,37 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-First public version.
+## [0.2.0] - unreleased
 
-- Load and validate ODCS v3 contracts (ODCS 3.0 rule names supported as aliases)
-- Schema checks (table and columns exist, logicalType, extra columns) and quality checks (rowCount, nullValues, missingValues, duplicateValues, invalidValues, custom SQL)
-- Batch / micro-batch filtering with `--where`; pass, warn, fail and quarantine
-- Notifications to source and platform teams via Slack, Teams, webhook and email
-- Meta tables created inside each platform; run history with `odcr history`
-- Reconciliation between source and target, including across platforms
-- End-to-end stage checkpoints and `odcr trace`
-- Adapters: PostgreSQL, MySQL/MariaDB (tested), SQL Server (implemented)
+### Added
+- 18 adapters: DuckDB, SQLite, files (local, ADLS Gen2, Blob, S3, GCS, MinIO), PostgreSQL, MySQL/MariaDB,
+  SQL Server/Azure SQL, Azure Synapse, Fabric Warehouse, Oracle, IBM Db2, Trino/Starburst/Presto, Snowflake,
+  Databricks (Azure, AWS, GCP), BigQuery, Redshift, Athena, MongoDB, Azure Cosmos DB.
+- `odcr init`: interactive project scaffolding (like `dbt init`) with config, `.env.example`, contracts,
+  reconciliations, seeds, job wrappers for Linux/macOS/Unix and Windows, tests and CI for GitHub and Azure DevOps.
+- Central contract repository: `contracts.path` or `contracts.git` (cloned and refreshed); `--contract-id` and
+  `--for-object` lookup; `odcr contracts`; `odcr lint` on folders.
+- `odcr watch`: check every new file or batch the moment it lands; processed batches are remembered.
+- `odcr adapters`, `odcr doctor`, `odcr seed`.
+- Notifications: Microsoft Teams (Adaptive Cards), Google Chat, Discord, PagerDuty, Opsgenie; SMTP with STARTTLS
+  or implicit TLS; custom CA bundles and proxies.
+- `meta.connection`: store results on another platform (for read-only sources).
+- Custom quality rules per engine (`engine: mongodb`, `engine: cosmosdb`); rules for other engines are skipped.
+- `${file:/path}` secrets and automatic `.env` loading.
+- Airflow operators: `OdcrContractOperator`, `OdcrReconcileOperator`, `OdcrCheckpointOperator`.
+- Reference project per adapter in `examples/`; documentation site; Dockerfile; release workflow with PyPI
+  trusted publishing.
+- CI on Windows, macOS and Linux; end-to-end tests against PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, Trino
+  and MongoDB; cloud end-to-end tests when credentials are configured.
+
+### Changed
+- Minimum Python version is 3.10.
+- SQL Server connections encrypt and verify the server certificate by default.
+
+## [0.1.0] - 2026-11-26
+
+### Added
+- First public version: ODCS v3 contracts, schema and quality checks, quarantine, notifications (Slack, Teams,
+  email, webhook), meta tables, reconciliation, end-to-end tracing; PostgreSQL, MySQL and SQL Server adapters.

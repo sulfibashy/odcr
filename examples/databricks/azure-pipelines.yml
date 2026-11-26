@@ -1,0 +1,12 @@
+# Azure DevOps pipeline for the contract repository
+trigger: [main]
+pr: [main]
+pool:
+  vmImage: ubuntu-latest
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+  - script: pip install odcr pytest
+  - script: odcr lint contracts
+  - script: pytest -q

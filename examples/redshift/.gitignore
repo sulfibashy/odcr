@@ -1,0 +1,7 @@
+.env
+*.duckdb
+*.duckdb.wal
+*.sqlite
+__pycache__/
+.pytest_cache/
+landing/

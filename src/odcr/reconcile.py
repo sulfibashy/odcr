@@ -27,10 +27,8 @@ import yaml
 
 from . import notify
 from .adapters.base import Adapter
-from .checks import relation
 from .config import Config
 from .contract import Contact, ContractError
-from .meta import ensure_meta, table_name
 
 AGGREGATES = {"rowCount", "sum", "min", "max", "distinctCount", "nullCount"}
 CHECK_TYPES = AGGREGATES | {"missingKeys"}
@@ -162,26 +160,19 @@ def _fmt(v: Any) -> str | None:
     return f"{f:g}" if f is not None and not isinstance(v, str) else str(v)
 
 
+def _where(side: Side, batch_id: str | None) -> str | None:
+    if side.where and batch_id is not None:
+        return side.where.replace("{batch_id}", str(batch_id))
+    return side.where
+
+
 def _aggregate(adapter: Adapter, side: Side, check: ReconCheck, column: str | None, batch_id: str | None) -> Any:
-    where = side.where.replace("{batch_id}", str(batch_id)) if side.where and batch_id is not None else side.where
-    rel = relation(adapter, side.object, where)
-    q = adapter.quote
-    expr = {
-        "rowCount": "COUNT(*)",
-        "sum": f"SUM({q(column)})" if column else "",
-        "min": f"MIN({q(column)})" if column else "",
-        "max": f"MAX({q(column)})" if column else "",
-        "distinctCount": f"COUNT(DISTINCT {q(column)})" if column else "",
-        "nullCount": f"SUM(CASE WHEN {q(column)} IS NULL THEN 1 ELSE 0 END)" if column else "",
-    }[check.type]
-    return adapter.scalar(f"SELECT {expr} FROM {rel}")
+    return adapter.aggregate(side.object, _where(side, batch_id), check.type, column)
 
 
 def _keys(adapter: Adapter, side: Side, column: str, batch_id: str | None, limit: int) -> set[str]:
-    where = side.where.replace("{batch_id}", str(batch_id)) if side.where and batch_id is not None else side.where
-    rel = relation(adapter, side.object, where)
-    sql = adapter.limit(f"SELECT DISTINCT {adapter.quote(column)} FROM {rel}", limit + 1)
-    keys = {str(r[0]) for r in adapter.fetchall(sql) if r[0] is not None}
+    values = adapter.distinct_values(side.object, _where(side, batch_id), column, limit + 1)
+    keys = {str(v) for v in values if v is not None}
     if len(keys) > limit:
         raise ValueError(f"more than maxKeys={limit} keys; narrow the batch with 'where'")
     return keys
@@ -237,6 +228,8 @@ def run_reconciliation(recon: Reconciliation, source: Adapter, target: Adapter, 
                     t = _aggregate(target, recon.target, check, check.target_column, batch_id)
                     results.append(_compare(check, s, t))
             except Exception as exc:  # noqa: BLE001
+                source._rollback()
+                target._rollback()
                 results.append(ReconCheckResult(check.check_id, check.type, check.source_column, None, None, None,
                                                 "", "error", f"check could not run: {exc}"))
     except Exception as exc:  # noqa: BLE001
@@ -246,15 +239,15 @@ def run_reconciliation(recon: Reconciliation, source: Adapter, target: Adapter, 
 
     meta.connect()
     schema = config.meta_schema
-    ensure_meta(meta, schema)
-    meta.insert(table_name(meta, schema, "reconciliation_runs"), {
+    meta.meta_ensure(schema)
+    meta.meta_insert(schema, "reconciliation_runs", [{
         "run_id": run_id, "recon_id": recon.id, "source_object": recon.source.object,
         "target_object": recon.target.object, "batch_id": batch_id, "pipeline": pipeline, "started_at": started,
         "finished_at": utcnow(), "status": status, "checks_total": len(results),
         "checks_failed": sum(1 for r in results if r.status != "passed"), "error_message": error,
-    })
+    }])
     now = utcnow()
-    meta.insert_many(table_name(meta, schema, "reconciliation_results"), [
+    meta.meta_insert(schema, "reconciliation_results", [
         {"run_id": run_id, "check_id": r.check_id, "check_type": r.check_type, "column_name": r.column,
          "source_value": r.source_value, "target_value": r.target_value, "difference": r.difference,
          "tolerance": r.tolerance, "status": r.status, "message": r.message, "created_at": now}
@@ -265,7 +258,7 @@ def run_reconciliation(recon: Reconciliation, source: Adapter, target: Adapter, 
         if recips:
             subject = f"[odcr] {status.upper()}: reconciliation {recon.id}" + (f" batch {batch_id}" if batch_id else "")
             result.notifications = notify.send(recips, subject, result.summary(), {"recon_id": recon.id},
-                                               config.notifications.get("smtp"))
+                                               config.notifications)
             from .runner import log_notifications
             log_notifications(meta, schema, run_id, "reconciliation", result.notifications, subject)
     return result

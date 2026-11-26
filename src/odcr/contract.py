@@ -57,6 +57,8 @@ class QualityRule:
     severity: str = "error"
     name: str | None = None
     description: str | None = None
+    engine: str | None = None  # custom rules
+    implementation: Any = None  # custom rules
 
 
 @dataclass
@@ -140,6 +142,8 @@ def _parse_quality(items: Any, where: str, problems: list[str]) -> list[QualityR
             severity=_severity(item),
             name=item.get("name"),
             description=item.get("description"),
+            engine=(str(item["engine"]).lower() if item.get("engine") else None),
+            implementation=item.get("implementation"),
         )
         # ODCS 3.0 style: validValues given directly on the rule
         if "validValues" in item and "validValues" not in rule.arguments:
@@ -154,11 +158,15 @@ def _parse_quality(items: Any, where: str, problems: list[str]) -> list[QualityR
         elif rtype == "sql":
             if not rule.query:
                 problems.append(f"{loc}: sql rule needs 'query'")
-        elif rtype in ("text", "custom"):
+        elif rtype == "text":
             pass  # documented only, not executed
+        elif rtype == "custom":
+            if rule.engine and rule.implementation is None:
+                problems.append(f"{loc}: custom rule with an engine needs 'implementation'")
         else:
             problems.append(f"{loc}: unknown quality type '{rtype}'")
-        if rtype in ("library", "sql") and comparator is None:
+        executable = rtype in ("library", "sql") or (rtype == "custom" and rule.engine)
+        if executable and comparator is None:
             # ODCS default expectation for counts of bad rows is zero
             if rule.metric != "rowCount":
                 rule.comparator, rule.threshold = "mustBe", 0
@@ -173,19 +181,20 @@ def _parse_quality(items: Any, where: str, problems: list[str]) -> list[QualityR
 
 def _contacts(doc: dict[str, Any]) -> list[Contact]:
     from .config import interpolate  # webhook URLs can come from env vars, keeping secrets out of Git
+    from .notify import CHANNELS, channel_name
 
     contacts: list[Contact] = []
     for ch in interpolate(doc.get("support") or []):
         if not isinstance(ch, dict):
             continue
-        tool = str(ch.get("tool", "")).lower()
-        url = ch.get("url")
-        if tool in ("slack", "teams", "webhook") and url:
-            contacts.append(Contact(tool, url, ch.get("channel")))
-        elif tool == "email" or (url and str(url).startswith("mailto:")):
-            target = str(url or ch.get("channel", "")).replace("mailto:", "")
+        tool = channel_name(ch.get("tool", ""))
+        url = str(ch.get("url") or "")
+        if tool == "email" or url.startswith("mailto:"):
+            target = (url or str(ch.get("channel", ""))).replace("mailto:", "")
             if target:
                 contacts.append(Contact("email", target, ch.get("channel")))
+        elif tool in CHANNELS and tool != "console" and url:
+            contacts.append(Contact(tool, url, ch.get("channel")))
     return contacts
 
 
