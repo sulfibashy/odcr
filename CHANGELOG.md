@@ -9,6 +9,7 @@ All notable changes to this project are documented here. The format follows
 - `odcr destroy [folder]`: deletes a project created by `odcr init`. It shows what will be deleted (including
   files you added, such as `.env`), asks you to type the project name, never touches database tables, and refuses
   folders that are not odcr projects or that you are currently inside. `--yes` skips the question for scripts.
+- `odcr doctor` shows the connection settings it uses (host, database, user; never the password).
 - `odcr init` writes `.odcr/project.json`, which marks the folder as an odcr project.
 
 ### Fixed

@@ -107,6 +107,7 @@ def test_cli_quickstart_end_to_end(adapter, tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("DUCKDB_PATH", str(root / "db.duckdb"))
     monkeypatch.setenv("ODCR_META_PATH", str(root / "meta.duckdb"))
     assert main(["doctor"]) == 0
+    assert "settings:" in capsys.readouterr().out
     assert main(["meta-init"]) == 0
     assert main(["seed"]) == 0
     assert main(["lint"]) == 0

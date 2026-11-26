@@ -136,6 +136,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print(f"connection '{args.connection}': {info.title}")
     adapter = get_adapter(opts)
     print(f"  driver:      {adapter.driver_version()}")
+    shown = {k: v for k, v in opts.items() if k in ("host", "port", "database", "user", "username", "account",
+                                                     "warehouse", "endpoint", "project", "dataset", "catalog",
+                                                     "schema", "path", "storage", "client") and v not in (None, "")}
+    print("  settings:    " + ", ".join(f"{k}={v}" for k, v in shown.items())
+          + ("  (password set)" if opts.get("password") else ""))
     ok = True
     try:
         adapter.connect()
