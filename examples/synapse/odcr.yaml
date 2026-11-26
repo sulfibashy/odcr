@@ -27,12 +27,12 @@ on_fail: quarantine
 notifications:
   notify_on: [fail, warn]
   # The platform team hears about every failure, on every contract.
+  # (The odcr command already prints results; add `- type: console` for library / Python API use.)
   platform_team:
-    - type: console
     - type: teams
       url: ${PLATFORM_TEAMS_WEBHOOK}
   smtp:                      # used by email channels; TLS is verified with the system CA store
-    host: ${SMTP_HOST:-localhost}
+    host: ${SMTP_HOST:-}        # e.g. smtp.office365.com, smtp.gmail.com
     port: ${SMTP_PORT:-587}
     starttls: true
     user: ${SMTP_USER:-}

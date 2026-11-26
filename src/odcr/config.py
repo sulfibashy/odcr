@@ -26,11 +26,10 @@ def interpolate(value: Any) -> Any:
         value = _FILE.sub(lambda m: Path(os.path.expanduser(m.group(1))).read_text(encoding="utf-8").strip(), value)
         def sub(m: re.Match[str]) -> str:
             name, default = m.group(1), m.group(2)
-            if name in os.environ:
-                return os.environ[name]
-            if default is not None:
-                return default
-            return ""
+            value = os.environ.get(name)
+            if default is not None:  # ${VAR:-default}: like the shell, an empty value also uses the default
+                return value if value else default
+            return value or ""
         return _ENV.sub(sub, value)
     if isinstance(value, dict):
         return {k: interpolate(v) for k, v in value.items()}

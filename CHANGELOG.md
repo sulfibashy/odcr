@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format follows
 - `odcr init --adapter <name>` no longer asks for the adapter again in interactive mode; `--name` skips the
   project-name question too.
 - A mistyped adapter name (e.g. `postgress`) now suggests the right one.
+- `${VAR:-default}` now uses the default when the variable is set but empty (as in the shell), so an empty
+  `SMTP_HOST=` in `.env` no longer breaks email.
+- Email alerts without a mail server now say so clearly (set `SMTP_HOST`) instead of "please run connect() first".
+- New projects no longer print the summary twice (the console alert is left out of the generated config).
 - `odcr init` without a folder creates a new folder named after the project (like `dbt init`), instead of
   `odcr_project`; nothing is ever written into the current folder itself.
 

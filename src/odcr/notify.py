@@ -95,7 +95,10 @@ def _send_email(smtp: dict[str, Any], to: str, subject: str, body: str) -> None:
     msg["From"] = smtp.get("from", "odcr@localhost")
     msg["To"] = to
     msg.set_content(body)
-    host, timeout = smtp.get("host", "localhost"), float(smtp.get("timeout", 10))
+    host, timeout = smtp.get("host"), float(smtp.get("timeout", 10))
+    if not host:
+        raise ValueError("no mail server configured: set SMTP_HOST (and SMTP_USER / SMTP_PASSWORD) in .env, "
+                         "or remove email from the notifications")
     if smtp.get("ssl"):  # implicit TLS, usually port 465
         with smtplib.SMTP_SSL(host, int(smtp.get("port", 465)), timeout=timeout,
                               context=_ssl_context(smtp)) as server:

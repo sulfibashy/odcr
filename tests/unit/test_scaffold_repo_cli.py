@@ -30,7 +30,7 @@ def test_scaffold_every_adapter(adapter, tmp_path):
     assert sorted(str(p.relative_to(root)).replace("\\", "/") for p in written) == sorted(EXPECTED)
     config = parse_config(yaml.safe_load((root / "odcr.yaml").read_text()), base_dir=root)
     assert config.connection("main")["type"] == adapter
-    assert config.platform_team[1]["type"] == "teams"
+    assert config.platform_team[0]["type"] == "teams"
     repo = ContractRepository.from_config(config)
     assert list(repo.contracts) == ["orders"] and not repo.errors
     env = (root / ".env.example").read_text()

@@ -12,6 +12,9 @@ def test_interpolation(monkeypatch, tmp_path):
     monkeypatch.setenv("HOST_X", "db.example")
     assert interpolate("${HOST_X}:${PORT_X:-5432}") == "db.example:5432"
     assert interpolate({"a": ["${MISSING_X}"]}) == {"a": [""]}
+    monkeypatch.setenv("EMPTY_X", "")
+    assert interpolate("${EMPTY_X:-fallback}") == "fallback"  # empty value uses the default, like the shell
+    assert interpolate("${EMPTY_X}") == ""
     secret = tmp_path / "pw"
     secret.write_text("s3cret\n")
     assert interpolate(f"${{file:{secret}}}") == "s3cret"
@@ -98,6 +101,11 @@ def test_failures_are_recorded_not_raised(tmp_path):
                       "s", "b", {}, {"ca_bundle": str(bad_ca), "smtp": {"host": "127.0.0.1", "port": 9}})
     assert [d.status for d in out] == ["failed"] * 4
     assert all(d.error for d in out)
+
+
+def test_email_without_server_explains_itself():
+    out = notify.send([notify.Recipient("email", "a@b.com", "platform")], "s", "b", {}, {"smtp": {"host": ""}})
+    assert out[0].status == "failed" and "SMTP_HOST" in out[0].error
 
 
 def test_ssl_context_options(tmp_path):

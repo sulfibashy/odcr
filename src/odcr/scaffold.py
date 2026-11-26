@@ -129,8 +129,8 @@ def config_yaml(info: AdapterInfo, platform_channel: str, platform_target: str, 
         "slack": "    - type: slack\n      url: ${PLATFORM_SLACK_WEBHOOK}",
         "teams": "    - type: teams\n      url: ${PLATFORM_TEAMS_WEBHOOK}",
         "email": f"    - type: email\n      to: [{platform_target or 'data-platform@example.com'}]",
-        "none": "",
-    }.get(platform_channel, "")
+        "none": "    []",
+    }.get(platform_channel, "    []")
     return f"""# odcr project configuration. ${{VAR}} and ${{VAR:-default}} come from environment variables;
 # ${{file:/run/secrets/name}} reads a secret file. Never put passwords or tokens in this file.
 name: {{name}}
@@ -154,11 +154,11 @@ on_fail: quarantine
 notifications:
   notify_on: [fail, warn]
   # The platform team hears about every failure, on every contract.
+  # (The odcr command already prints results; add `- type: console` for library / Python API use.)
   platform_team:
-    - type: console
 {channel}
   smtp:                      # used by email channels; TLS is verified with the system CA store
-    host: ${{SMTP_HOST:-localhost}}
+    host: ${{SMTP_HOST:-}}        # e.g. smtp.office365.com, smtp.gmail.com
     port: ${{SMTP_PORT:-587}}
     starttls: true
     user: ${{SMTP_USER:-}}
