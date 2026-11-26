@@ -203,3 +203,18 @@ def test_interactive_only_asks_for_what_was_not_given(tmp_path):
 def test_adapter_typo_gets_a_suggestion(tmp_path):
     with pytest.raises(ValueError, match="Did you mean 'postgres'"):
         scaffold(tmp_path / "p", adapter="postgress")
+
+
+def test_init_creates_a_folder_named_after_the_project(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    answers = iter(["sales_contracts", "", "", "none"])
+    written = scaffold(None, adapter="postgres", interactive=True, reader=lambda _: next(answers))
+    assert (tmp_path / "sales_contracts" / "odcr.yaml").exists()
+    assert all(tmp_path / "sales_contracts" in p.parents for p in written)
+    assert not (tmp_path / "odcr.yaml").exists()  # nothing written into the current folder
+    assert main(["init", "--name", "finance", "--adapter", "sqlite", "--no-input"]) == 0
+    assert (tmp_path / "finance" / "odcr.yaml").exists()
+    assert main(["init", "--adapter", "sqlite", "--no-input"]) == 0
+    assert (tmp_path / "odcr_project" / "odcr.yaml").exists()
+    with pytest.raises(ValueError):
+        scaffold(None, interactive=True, reader=lambda _: "bad name!")

@@ -12,7 +12,7 @@ usage: odcr init [-h] [--adapter ADAPTER] [--name NAME] [--meta-schema META_SCHE
                  [directory]
 
 positional arguments:
-  directory
+  directory             folder to create (default: a new folder named after the project)
 
 options:
   -h, --help            show this help message and exit

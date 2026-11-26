@@ -22,7 +22,7 @@ Schema for the meta tables [odcr_meta]:
 Platform team alerts (slack, teams, email, none) [email]: teams
 ```
 
-Non-interactive (CI, scripts): `odcr init my_contracts --adapter snowflake --alerts teams --no-input`.
+The project is created in a new folder named after the project. Non-interactive (CI, scripts): `odcr init my_contracts --adapter snowflake --alerts teams --no-input`.
 
 ## 2. Connect
 

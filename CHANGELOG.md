@@ -9,6 +9,8 @@ All notable changes to this project are documented here. The format follows
 - `odcr init --adapter <name>` no longer asks for the adapter again in interactive mode; `--name` skips the
   project-name question too.
 - A mistyped adapter name (e.g. `postgress`) now suggests the right one.
+- `odcr init` without a folder creates a new folder named after the project (like `dbt init`), instead of
+  `odcr_project`; nothing is ever written into the current folder itself.
 
 ## [0.2.0] - 2026-11-27
 

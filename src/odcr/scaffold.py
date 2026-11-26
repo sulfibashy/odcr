@@ -374,17 +374,22 @@ def ask(prompt: str, default: str, options: list[str] | None = None,
             print(f"  choose one of: {', '.join(options)}")
 
 
-def scaffold(directory: str | Path, *, name: str | None = None, adapter: str | None = None,
+def scaffold(directory: str | Path | None = None, *, name: str | None = None, adapter: str | None = None,
              meta_schema: str = "odcr_meta", platform_channel: str = "email", platform_target: str = "",
              force: bool = False, interactive: bool = False, reader: Callable[[str], str] = input) -> list[Path]:
-    """Create the project. Returns the files written."""
-    root = Path(directory)
+    """Create the project in its own folder. Returns the files written.
+
+    Like `dbt init`: without a directory, the folder is named after the project (asked for, or --name).
+    """
+    root = Path(directory) if directory is not None else None
     if adapter is not None:
         adapter = resolve(adapter).name  # fail fast on a typo, before asking anything
     if interactive:
         print("Creating an odcr project. Press Enter to accept the [default].\n")
         if name is None:
-            name = ask("Project name", root.name or "odcr_project", reader=reader)
+            name = ask("Project name", root.name if root else "odcr_project", reader=reader)
+            if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+                raise ValueError("Project name may only contain letters, digits, '_', '-' and '.'")
         if adapter is None:  # only asked when --adapter was not given
             print("\nAdapters:")
             for i, key in enumerate(PROMPT_ORDER, 1):
@@ -400,6 +405,8 @@ def scaffold(directory: str | Path, *, name: str | None = None, adapter: str | N
             platform_target = ask("Platform team email", platform_target or "data-platform@example.com",
                                   reader=reader)
     info = resolve(adapter or "duckdb")
+    if root is None:
+        root = Path.cwd() / (name or "odcr_project")
     name = name or root.name or "odcr_project"
     if root.exists() and any(root.iterdir()) and not force:
         raise FileExistsError(f"{root} is not empty; use --force to write into it")

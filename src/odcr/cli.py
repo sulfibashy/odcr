@@ -56,16 +56,19 @@ def cmd_init(args: argparse.Namespace) -> int:
     from .scaffold import scaffold
 
     interactive = not args.no_input and sys.stdin.isatty()
-    target = Path(args.directory)
-    files = scaffold(target, name=args.name, adapter=args.adapter, meta_schema=args.meta_schema,
+    directory = args.directory or (args.name if args.name else None)
+    if directory is None and not interactive:
+        directory = "odcr_project"
+    files = scaffold(directory, name=args.name, adapter=args.adapter, meta_schema=args.meta_schema,
                      platform_channel=args.alerts, force=args.force, interactive=interactive)
+    target = files[0].parent  # odcr.yaml sits in the project folder
     for f in files:
-        print(f"  create {f}")
+        print(f"  create {f.relative_to(target.parent)}")
     info = resolve(next(line.split(":", 1)[1].strip() for line in (target / "odcr.yaml").read_text().splitlines()
                         if line.strip().startswith("type:")))
     extra = f'"odcr[{info.extra}]"' if info.extra else "odcr"
-    print(f"\nCreated an odcr project for {info.title} in {target}\n\nNext steps:\n"
-          f"  cd {target}\n  pip install {extra}\n  cp .env.example .env      # then fill in the connection\n"
+    print(f"\nCreated an odcr project for {info.title} in {target.resolve()}\n\nNext steps:\n"
+          f"  cd {target.name if target.parent.resolve() == Path.cwd().resolve() else target}\n  pip install {extra}\n  cp .env.example .env      # then fill in the connection\n"
           "  odcr doctor -C main\n  odcr meta-init -C main\n  odcr seed -C main          # optional sample data\n"
           "  odcr run --contract-id orders -C main\n")
     return EXIT_OK
@@ -315,7 +318,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--for-object", help="find the contract describing this table / collection / path")
 
     sp = sub.add_parser("init", help="create a new odcr project (like dbt init)")
-    sp.add_argument("directory", nargs="?", default="odcr_project")
+    sp.add_argument("directory", nargs="?", help="folder to create (default: a new folder named after the project)")
     sp.add_argument("--adapter", "-a", help="platform, e.g. postgres, snowflake, databricks (see: odcr adapters)")
     sp.add_argument("--name", help="project name (default: the directory name)")
     sp.add_argument("--meta-schema", default="odcr_meta")
