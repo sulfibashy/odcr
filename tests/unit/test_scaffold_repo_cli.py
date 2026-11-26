@@ -182,3 +182,24 @@ def test_airflow_operator_without_airflow(tmp_path, monkeypatch):
         bad.execute({})
     assert OdcrCheckpointOperator(task_id="c", config_path=str(root / "odcr.yaml"), pipeline="orders",
                                   stage="gold", batch_id="batch-001", row_count=4).execute({})
+
+
+def test_interactive_only_asks_for_what_was_not_given(tmp_path):
+    asked: list[str] = []
+
+    def reader(prompt: str) -> str:
+        asked.append(prompt)
+        return ""
+
+    scaffold(tmp_path / "p", adapter="postgres", interactive=True, reader=reader)
+    assert not any("Which platform" in q for q in asked), asked  # --adapter given: not asked again
+    assert any("Project name" in q for q in asked)
+    assert "type: postgres" in (tmp_path / "p" / "odcr.yaml").read_text()
+    asked.clear()
+    scaffold(tmp_path / "q", name="n", adapter="postgresql", interactive=True, reader=reader)
+    assert not any("Project name" in q or "Which platform" in q for q in asked)
+
+
+def test_adapter_typo_gets_a_suggestion(tmp_path):
+    with pytest.raises(ValueError, match="Did you mean 'postgres'"):
+        scaffold(tmp_path / "p", adapter="postgress")

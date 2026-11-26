@@ -57,7 +57,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     interactive = not args.no_input and sys.stdin.isatty()
     target = Path(args.directory)
-    files = scaffold(target, name=args.name, adapter=args.adapter or "duckdb", meta_schema=args.meta_schema,
+    files = scaffold(target, name=args.name, adapter=args.adapter, meta_schema=args.meta_schema,
                      platform_channel=args.alerts, force=args.force, interactive=interactive)
     for f in files:
         print(f"  create {f}")

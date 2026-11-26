@@ -374,26 +374,32 @@ def ask(prompt: str, default: str, options: list[str] | None = None,
             print(f"  choose one of: {', '.join(options)}")
 
 
-def scaffold(directory: str | Path, *, name: str | None = None, adapter: str = "duckdb",
+def scaffold(directory: str | Path, *, name: str | None = None, adapter: str | None = None,
              meta_schema: str = "odcr_meta", platform_channel: str = "email", platform_target: str = "",
              force: bool = False, interactive: bool = False, reader: Callable[[str], str] = input) -> list[Path]:
     """Create the project. Returns the files written."""
     root = Path(directory)
+    if adapter is not None:
+        adapter = resolve(adapter).name  # fail fast on a typo, before asking anything
     if interactive:
         print("Creating an odcr project. Press Enter to accept the [default].\n")
-        name = ask("Project name", name or root.name or "odcr_project", reader=reader)
-        print("\nAdapters:")
-        for i, key in enumerate(PROMPT_ORDER, 1):
-            info = ADAPTERS[key]
-            print(f"  {i:>2}. {key:<11} {info.title}")
-        adapter = ask("Which platform will odcr check", adapter, PROMPT_ORDER, reader=reader)
+        if name is None:
+            name = ask("Project name", root.name or "odcr_project", reader=reader)
+        if adapter is None:  # only asked when --adapter was not given
+            print("\nAdapters:")
+            for i, key in enumerate(PROMPT_ORDER, 1):
+                info = ADAPTERS[key]
+                print(f"  {i:>2}. {key:<11} {info.title}")
+            adapter = ask("Which platform will odcr check", "duckdb", PROMPT_ORDER, reader=reader)
+        else:
+            print(f"Adapter: {adapter} ({ADAPTERS[adapter].title})")
         meta_schema = ask("Schema for the meta tables", meta_schema, reader=reader)
         platform_channel = ask("Platform team alerts (slack, teams, email, none)", platform_channel,
                                ["slack", "teams", "email", "none"], reader=reader)
         if platform_channel == "email":
             platform_target = ask("Platform team email", platform_target or "data-platform@example.com",
                                   reader=reader)
-    info = resolve(adapter)
+    info = resolve(adapter or "duckdb")
     name = name or root.name or "odcr_project"
     if root.exists() and any(root.iterdir()) and not force:
         raise FileExistsError(f"{root} is not empty; use --force to write into it")

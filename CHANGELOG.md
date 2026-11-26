@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-11-27
+
+### Fixed
+- `odcr init --adapter <name>` no longer asks for the adapter again in interactive mode; `--name` skips the
+  project-name question too.
+- A mistyped adapter name (e.g. `postgress`) now suggests the right one.
+
 ## [0.2.0] - 2026-11-27
 
 ### Added

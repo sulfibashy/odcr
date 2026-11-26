@@ -144,7 +144,11 @@ def resolve(name: str) -> AdapterInfo:
     key = str(name).lower()
     key = _ALIASES.get(key, key)
     if key not in ADAPTERS:
-        raise ValueError(f"Unsupported adapter '{name}'. Run `odcr adapters` to list them "
+        import difflib
+
+        close = difflib.get_close_matches(key, list(ADAPTERS) + list(_ALIASES), n=1)
+        hint = f" Did you mean '{_ALIASES.get(close[0], close[0])}'?" if close else ""
+        raise ValueError(f"Unsupported adapter '{name}'.{hint} Run `odcr adapters` to list them "
                          f"({', '.join(sorted(ADAPTERS))}).")
     return ADAPTERS[key]
 
