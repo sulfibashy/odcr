@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from collections.abc import Callable
@@ -25,6 +26,8 @@ import yaml
 
 from . import samples
 from .adapters import ADAPTERS, AdapterInfo, resolve
+
+MANIFEST = ".odcr/project.json"  # marks a folder as an odcr project; `odcr destroy` relies on it
 
 PROMPT_ORDER = ["duckdb", "files", "sqlite", "postgres", "mysql", "sqlserver", "oracle", "db2", "trino",
                 "databricks", "snowflake", "bigquery", "redshift", "athena", "synapse", "fabric", "mongodb", "cosmosdb"]
@@ -425,6 +428,8 @@ def scaffold(directory: str | Path | None = None, *, name: str | None = None, ad
         "README.md": readme(name, info),
         ".gitignore": GITIGNORE,
     }
+    files[MANIFEST] = json.dumps({"project": name, "adapter": info.name, "created_by": "odcr init",
+                                  "files": sorted(files)}, indent=2) + "\n"
     written: list[Path] = []
     for rel, content in files.items():
         path = root / rel
@@ -439,3 +444,44 @@ def scaffold(directory: str | Path | None = None, *, name: str | None = None, ad
 def describe(info: AdapterInfo) -> dict[str, Any]:
     return {"name": info.name, "title": info.title, "install": f"pip install \"odcr[{info.extra}]\"" if info.extra
             else "pip install odcr"}
+
+
+def find_project(directory: str | Path | None = None) -> Path:
+    """The project folder: the given one, or the current folder if it is an odcr project."""
+    root = Path(directory) if directory else Path.cwd()
+    if (root / MANIFEST).is_file() or (root / "odcr.yaml").is_file():
+        return root.resolve()
+    raise FileNotFoundError(f"{root} is not an odcr project (no odcr.yaml or {MANIFEST})")
+
+
+def project_name(root: Path) -> str:
+    manifest = root / MANIFEST
+    if manifest.is_file():
+        return str(json.loads(manifest.read_text(encoding="utf-8")).get("project") or root.name)
+    for line in (root / "odcr.yaml").read_text(encoding="utf-8").splitlines():
+        if line.startswith("name:"):
+            return line.split(":", 1)[1].strip() or root.name
+    return root.name
+
+
+def user_files(root: Path) -> list[Path]:
+    """Files in the project that `odcr init` did not create (e.g. .env, new contracts, local databases)."""
+    manifest = root / MANIFEST
+    created = set(json.loads(manifest.read_text(encoding="utf-8"))["files"]) if manifest.is_file() else set()
+    created.add(MANIFEST)
+    return sorted(p for p in root.rglob("*")
+                  if p.is_file() and p.relative_to(root).as_posix() not in created)
+
+
+def remove_project(root: Path) -> int:
+    """Delete the whole project folder. Returns the number of files removed."""
+    import shutil
+
+    root = root.resolve()
+    if not ((root / MANIFEST).is_file() or (root / "odcr.yaml").is_file()):
+        raise FileNotFoundError(f"{root} is not an odcr project; refusing to delete it")
+    if root == Path(root.anchor) or root == Path.home().resolve():
+        raise ValueError(f"refusing to delete {root}")
+    count = sum(1 for p in root.rglob("*") if p.is_file())
+    shutil.rmtree(root)
+    return count

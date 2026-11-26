@@ -60,3 +60,13 @@ odcr history --contract-id orders
 
 Next: put your own contracts in `contracts/` (or point `odcr.yaml` at your shared contract repository),
 and call `jobs/ingestion_gate.*` from your pipelines.
+
+## Start over
+
+```bash
+cd ..                        # step out of the project folder
+odcr destroy my_contracts    # shows what will be deleted, then asks you to type the project name
+odcr init                    # create it again
+```
+
+`odcr destroy` deletes only the project folder; tables and meta tables in your databases are not touched.

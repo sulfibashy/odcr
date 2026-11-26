@@ -20,7 +20,7 @@ from odcr.scaffold import PROMPT_ORDER, scaffold
 EXPECTED = ["odcr.yaml", ".env.example", "contracts/sales/orders.odcs.yaml", "reconciliations/orders.recon.yaml",
             "seeds/orders.csv", "jobs/ingestion_gate.py", "jobs/ingestion_gate.sh", "jobs/ingestion_gate.ps1",
             "tests/test_contracts.py", ".github/workflows/contracts.yml", "azure-pipelines.yml", "README.md",
-            ".gitignore"]
+            ".gitignore", ".odcr/project.json"]
 
 
 @pytest.mark.parametrize("adapter", sorted(ADAPTERS))
@@ -218,3 +218,27 @@ def test_init_creates_a_folder_named_after_the_project(tmp_path, monkeypatch):
     assert (tmp_path / "odcr_project" / "odcr.yaml").exists()
     with pytest.raises(ValueError):
         scaffold(None, interactive=True, reader=lambda _: "bad name!")
+
+
+def test_destroy_removes_the_project_safely(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert main(["init", "proj", "--adapter", "sqlite", "--no-input"]) == 0
+    (tmp_path / "proj" / ".env").write_text("SECRET=1\n")
+    (tmp_path / "keep.txt").write_text("not part of the project")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    assert main(["destroy", "proj"]) == 2  # no confirmation possible: refused
+    assert (tmp_path / "proj").exists()
+    out = capsys.readouterr().out
+    assert ".env" in out and "NOT touched" in out  # user files are listed before deleting
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda _: "wrong")
+    assert main(["destroy", "proj"]) == 1 and (tmp_path / "proj").exists()  # wrong name: cancelled
+    monkeypatch.setattr("builtins.input", lambda _: "proj")
+    assert main(["destroy", "proj"]) == 0
+    assert not (tmp_path / "proj").exists() and (tmp_path / "keep.txt").exists()
+    assert main(["destroy", "."]) == 2  # not an odcr project
+    assert main(["init", "p2", "--adapter", "sqlite", "--no-input"]) == 0
+    monkeypatch.chdir(tmp_path / "p2")
+    assert main(["destroy", "--yes"]) == 2  # refuses while you are inside it
+    monkeypatch.chdir(tmp_path)
+    assert main(["destroy", "p2", "--yes"]) == 0 and not (tmp_path / "p2").exists()

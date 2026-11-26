@@ -26,6 +26,21 @@ options:
   --force               write into a non-empty directory
 ```
 
+## odcr destroy
+
+delete a project created by odcr init (asks for confirmation)
+
+```text
+usage: odcr destroy [-h] [--yes] [directory]
+
+positional arguments:
+  directory   project folder (default: the current folder)
+
+options:
+  -h, --help  show this help message and exit
+  --yes, -y   do not ask for confirmation
+```
+
 ## odcr adapters
 
 list supported platforms and how to install each

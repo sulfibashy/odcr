@@ -74,6 +74,42 @@ def cmd_init(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_destroy(args: argparse.Namespace) -> int:
+    from .scaffold import find_project, project_name, remove_project, user_files
+
+    try:
+        root = find_project(args.directory)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    if Path.cwd().resolve() == root or root in Path.cwd().resolve().parents:
+        print(f"error: you are inside {root}; run `cd {root.parent}` first, then `odcr destroy {root.name}`",
+              file=sys.stderr)
+        return EXIT_USAGE
+    name = project_name(root)
+    extra = user_files(root)
+    total = sum(1 for p in root.rglob("*") if p.is_file())
+    print(f"This deletes the odcr project '{name}' and everything in it:\n  {root}  ({total} files)")
+    if extra:
+        print(f"\n{len(extra)} of them were not created by odcr init (your own work):")
+        for p in extra[:15]:
+            print(f"  {p.relative_to(root)}")
+        if len(extra) > 15:
+            print(f"  ... and {len(extra) - 15} more")
+    print("\nTables and meta tables in your databases are NOT touched.")
+    if not args.yes:
+        if not sys.stdin.isatty():
+            print("error: confirmation needed; re-run with --yes to delete without asking", file=sys.stderr)
+            return EXIT_USAGE
+        answer = input(f"\nType the project name ({name}) to delete it: ").strip()
+        if answer != name:
+            print("Cancelled; nothing was deleted.")
+            return EXIT_FAIL
+    removed = remove_project(root)
+    print(f"Deleted {root} ({removed} files). Start again with: odcr init")
+    return EXIT_OK
+
+
 def cmd_adapters(args: argparse.Namespace) -> int:
     rows = []
     for info in ADAPTERS.values():
@@ -327,6 +363,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-input", action="store_true", help="do not ask questions; use the options and defaults")
     sp.add_argument("--force", action="store_true", help="write into a non-empty directory")
     sp.set_defaults(func=cmd_init)
+
+    sp = sub.add_parser("destroy",
+                        help="delete a project created by odcr init (asks for confirmation)")
+    sp.add_argument("directory", nargs="?", help="project folder (default: the current folder)")
+    sp.add_argument("--yes", "-y", action="store_true", help="do not ask for confirmation")
+    sp.set_defaults(func=cmd_destroy)
 
     sp = sub.add_parser("adapters", help="list supported platforms and how to install each")
     sp.add_argument("--json", action="store_true")

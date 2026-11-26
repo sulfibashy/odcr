@@ -96,10 +96,11 @@ def cli_reference() -> str:
     parser = build_parser()
     out = ["# CLI reference", "", "Generated from `odcr --help`.", ""]
     sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
-    for name, sp in sub.choices.items():
-        out += [f"## odcr {name}", "", (sp.description or sub._name_parser_map[name].description or
-                                       next(c.help for c in sub._choices_actions if c.dest == name)), "",
-                "```text", sp.format_help().replace("python -m pytest", "odcr").strip(), "```", ""]
+    for action in sub._choices_actions:  # one entry per command (aliases excluded)
+        name = action.dest.split(" ")[0]
+        sp = sub.choices[name]
+        out += [f"## odcr {name}", "", action.help or "", "",
+                "```text", sp.format_help().strip(), "```", ""]
     return "\n".join(out)
 
 
