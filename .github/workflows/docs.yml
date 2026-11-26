@@ -3,8 +3,8 @@ name: docs
 # Publishes the documentation site to GitHub Pages.
 # One-time setup: repository Settings -> Pages -> Source: GitHub Actions.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

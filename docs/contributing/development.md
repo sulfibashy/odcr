@@ -34,4 +34,5 @@ python scripts/generate_docs.py
 ## Releasing
 
 1. Update `CHANGELOG.md` and the version in `pyproject.toml` and `src/odcr/__init__.py`.
-2. Create a GitHub release with tag `vX.Y.Z`. The `release` workflow builds, tests and publishes to PyPI.
+2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`. The `release` workflow tests, builds, publishes to
+   PyPI (trusted publishing), creates the GitHub release from the changelog, and the `docs` workflow updates the site.
