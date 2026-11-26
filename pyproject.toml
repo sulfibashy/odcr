@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "odcr"
+version = "0.1.0"
+description = "Open Data Contract Runtime: enforce ODCS data contracts at ingestion, reconcile source and target, and trace batches end to end."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "odcr contributors" }]
+keywords = ["data contracts", "ODCS", "data quality", "observability", "reconciliation", "data engineering"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Database",
+]
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1"]
+mysql = ["PyMySQL>=1.1"]
+sqlserver = ["pyodbc>=5.0"]
+lint = ["datacontract-cli>=0.10"]
+all = ["psycopg[binary]>=3.1", "PyMySQL>=1.1", "pyodbc>=5.0"]
+dev = ["pytest>=8", "psycopg[binary]>=3.1", "PyMySQL>=1.1"]
+
+[project.scripts]
+odcr = "odcr.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"odcr.templates" = ["*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "e2e: end-to-end tests against a live database (skipped when the database is not reachable)",
+]

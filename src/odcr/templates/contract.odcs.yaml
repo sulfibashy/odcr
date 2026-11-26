@@ -1,0 +1,68 @@
+# ODCS v3 data contract template (Open Data Contract Standard, Bitol / LF AI & Data).
+# One file per dataset. Keep it in Git and review changes like code.
+apiVersion: v3.0.2
+kind: DataContract
+id: orders
+name: Orders
+version: 1.0.0
+status: active
+domain: sales
+dataProduct: orders
+description:
+  purpose: Orders received from the web shop, loaded every hour.
+
+team:
+  - username: order-team-lead
+    role: owner
+  - username: data-platform
+    role: platform
+
+# Who is notified when this contract is broken (the source team).
+support:
+  - channel: "#orders-data-alerts"
+    tool: slack
+    url: ${ORDERS_SLACK_WEBHOOK}        # resolved from the environment by your pipeline, or paste a URL
+  - channel: orders-team@example.com
+    tool: email
+    url: mailto:orders-team@example.com
+
+schema:
+  - name: orders
+    physicalName: orders               # schema.table is allowed, e.g. sales.orders
+    physicalType: table
+    properties:
+      - name: order_id
+        logicalType: integer
+        primaryKey: true               # implies required + unique checks
+      - name: customer_id
+        logicalType: integer
+        required: true
+      - name: status
+        logicalType: string
+        required: true
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues: [NEW, PAID, SHIPPED, CANCELLED]
+            mustBe: 0
+      - name: amount
+        logicalType: number
+        quality:
+          - type: library
+            metric: nullValues
+            mustBeLessOrEqualTo: 1
+            unit: percent
+            severity: warning          # warning = notify, but do not stop the pipeline
+      - name: order_date
+        logicalType: date
+        required: true
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+      - type: sql
+        name: orders.no_negative_amounts
+        description: Amounts must never be negative
+        query: SELECT COUNT(*) FROM {object} WHERE amount < 0
+        mustBe: 0
