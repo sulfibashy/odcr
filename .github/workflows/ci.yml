@@ -50,17 +50,20 @@ jobs:
         image: postgres:16
         env: {POSTGRES_PASSWORD: postgres, POSTGRES_DB: odcr_test}
         ports: ["5432:5432"]
-        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 30
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 30
       mysql:
         image: mysql:8.4
         env: {MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: odcr_test, MYSQL_USER: odcr, MYSQL_PASSWORD: odcr}
         ports: ["3306:3306"]
-        options: --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot" --health-interval 5s --health-retries 40
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot" --health-interval 5s --health-retries 40
       mariadb:
         image: mariadb:11
         env: {MARIADB_ROOT_PASSWORD: root, MARIADB_DATABASE: odcr_test, MARIADB_USER: odcr, MARIADB_PASSWORD: odcr}
         ports: ["3307:3306"]
-        options: --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-retries 40
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-retries 40
       sqlserver:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env: {ACCEPT_EULA: "Y", MSSQL_SA_PASSWORD: "Odcr_Passw0rd!"}
@@ -69,14 +72,16 @@ jobs:
         image: gvenzl/oracle-free:23-slim-faststart
         env: {ORACLE_PASSWORD: odcr, APP_USER: odcr, APP_USER_PASSWORD: odcr}
         ports: ["1521:1521"]
-        options: --health-cmd healthcheck.sh --health-interval 10s --health-retries 60
+        options: >-
+          --health-cmd healthcheck.sh --health-interval 10s --health-retries 60
       trino:
         image: trinodb/trino:latest
         ports: ["8080:8080"]
       mongodb:
         image: mongo:7
         ports: ["27017:27017"]
-        options: --health-cmd "mongosh --quiet --eval 'db.runCommand({ping: 1})'" --health-interval 5s --health-retries 30
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping: 1})'" --health-interval 5s --health-retries 30
     env:
       ODCR_PG_HOST: localhost
       ODCR_MYSQL_HOST: 127.0.0.1
