@@ -1,7 +1,13 @@
 """Notifications to the source team (from the contract's `support` channels) and the platform team (config).
 
-Channels: Slack, Microsoft Teams (Workflows / Power Automate webhooks), email (SMTP with STARTTLS or
-implicit TLS), Google Chat, Discord, PagerDuty, Opsgenie, any JSON webhook, and the console.
+Channels: Slack, Microsoft Teams (Workflows / Power Automate webhooks), email, Google Chat, Discord,
+PagerDuty, Opsgenie, any JSON webhook, and the console.
+
+Email providers (`notifications.mail.provider`), most of them without any stored password:
+  smtp-relay    company mail relay that trusts the server (no login)
+  smtp          SMTP login; password from the OS keychain (${keyring:...}), a secret file or the environment
+  microsoft365  Microsoft Graph sendMail with Entra ID: managed identity, workload identity, az login (no password)
+  aws-ses       Amazon SES with the IAM role / SSO profile of the machine (no password)
 
 Only the Python standard library is used. TLS certificates are always verified; a custom CA bundle
 (corporate proxy / private CA) can be set with `ca_bundle`, and an HTTP(S) proxy with `proxy`.
@@ -89,29 +95,82 @@ def _post_json(url: str, payload: dict[str, Any], settings: dict[str, Any],
             raise RuntimeError(f"HTTP {resp.status}")
 
 
-def _send_email(smtp: dict[str, Any], to: str, subject: str, body: str) -> None:
+def mail_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    """The `mail` block; the older `smtp` block still works and means provider smtp."""
+    if settings.get("mail"):
+        return dict(settings["mail"])
+    smtp = dict(settings.get("smtp") or {})
+    smtp.setdefault("provider", "smtp")
+    return smtp
+
+
+def _send_email(mail: dict[str, Any], to: str, subject: str, body: str, settings: dict[str, Any]) -> None:
+    provider = str(mail.get("provider", "smtp")).lower()
+    sender = mail.get("from") or mail.get("sender") or "odcr@localhost"
+    if provider in ("smtp", "smtp-relay", "gmail"):
+        _send_smtp(mail, sender, to, subject, body)
+    elif provider in ("microsoft365", "graph", "office365"):
+        _send_graph(mail, sender, to, subject, body, settings)
+    elif provider in ("aws-ses", "ses"):
+        _send_ses(mail, sender, to, subject, body)
+    else:
+        raise ValueError(f"unknown mail provider '{provider}' (smtp-relay, smtp, microsoft365, aws-ses)")
+
+
+def _send_smtp(mail: dict[str, Any], sender: str, to: str, subject: str, body: str) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = smtp.get("from", "odcr@localhost")
+    msg["From"] = sender
     msg["To"] = to
     msg.set_content(body)
-    host, timeout = smtp.get("host"), float(smtp.get("timeout", 10))
+    host, timeout = mail.get("host"), float(mail.get("timeout", 10))
     if not host:
-        raise ValueError("no mail server configured: set SMTP_HOST (and SMTP_USER / SMTP_PASSWORD) in .env, "
-                         "or remove email from the notifications")
-    if smtp.get("ssl"):  # implicit TLS, usually port 465
-        with smtplib.SMTP_SSL(host, int(smtp.get("port", 465)), timeout=timeout,
-                              context=_ssl_context(smtp)) as server:
-            if smtp.get("user"):
-                server.login(smtp["user"], smtp.get("password", ""))
+        raise ValueError("no mail server configured: set SMTP_HOST in .env (or choose another mail provider: "
+                         "microsoft365, aws-ses, smtp-relay)")
+    login = mail.get("user") and str(mail.get("provider")) != "smtp-relay"
+    if mail.get("ssl"):  # implicit TLS, usually port 465
+        with smtplib.SMTP_SSL(host, int(mail.get("port", 465)), timeout=timeout,
+                              context=_ssl_context(mail)) as server:
+            if login:
+                server.login(mail["user"], mail.get("password", ""))
             server.send_message(msg)
         return
-    with smtplib.SMTP(host, int(smtp.get("port", 587 if smtp.get("starttls") else 25)), timeout=timeout) as server:
-        if smtp.get("starttls"):
-            server.starttls(context=_ssl_context(smtp))
-        if smtp.get("user"):
-            server.login(smtp["user"], smtp.get("password", ""))
+    starttls = mail.get("starttls", True)
+    with smtplib.SMTP(host, int(mail.get("port", 587 if starttls else 25)), timeout=timeout) as server:
+        if starttls:
+            server.starttls(context=_ssl_context(mail))
+        if login:
+            server.login(mail["user"], mail.get("password", ""))
         server.send_message(msg)
+
+
+def _graph_token(mail: dict[str, Any]) -> str:
+    """An Entra ID token without stored passwords: managed identity, workload identity, Azure CLI login, or a
+    certificate-based service principal (AZURE_CLIENT_CERTIFICATE_PATH)."""
+    try:
+        from azure.identity import DefaultAzureCredential
+    except ImportError as exc:
+        raise ImportError("Microsoft 365 mail needs: pip install 'odcr[microsoft365]'") from exc
+    kwargs = {"managed_identity_client_id": mail["client_id"]} if mail.get("client_id") else {}
+    return DefaultAzureCredential(**kwargs).get_token("https://graph.microsoft.com/.default").token
+
+
+def _send_graph(mail: dict[str, Any], sender: str, to: str, subject: str, body: str,
+                settings: dict[str, Any]) -> None:
+    url = f"{mail.get('graph_url', 'https://graph.microsoft.com/v1.0').rstrip('/')}/users/{sender}/sendMail"
+    message = {"message": {"subject": subject, "body": {"contentType": "Text", "content": body},
+                           "toRecipients": [{"emailAddress": {"address": to}}]}, "saveToSentItems": False}
+    _post_json(url, message, {**settings, **mail}, headers={"Authorization": f"Bearer {_graph_token(mail)}"})
+
+
+def _send_ses(mail: dict[str, Any], sender: str, to: str, subject: str, body: str) -> None:
+    try:
+        import boto3
+    except ImportError as exc:
+        raise ImportError("Amazon SES mail needs: pip install 'odcr[aws-ses]'") from exc
+    client = boto3.client("sesv2", region_name=mail.get("region"))  # credentials: IAM role / SSO / profile
+    client.send_email(FromEmailAddress=sender, Destination={"ToAddresses": [to]},
+                      Content={"Simple": {"Subject": {"Data": subject}, "Body": {"Text": {"Data": body}}}})
 
 
 def _deliver(r: Recipient, subject: str, body: str, details: dict[str, Any], settings: dict[str, Any]) -> None:
@@ -119,7 +178,7 @@ def _deliver(r: Recipient, subject: str, body: str, details: dict[str, Any], set
     if r.channel == "console":
         print(f"{subject}\n{body}")
     elif r.channel == "email":
-        _send_email(settings.get("smtp") or {}, r.target, subject, body)
+        _send_email(mail_settings(settings), r.target, subject, body, settings)
     elif r.channel == "slack":
         _post_json(r.target, {"text": f"*{subject}*\n```{body}```"}, settings)
     elif r.channel == "teams":
@@ -151,7 +210,7 @@ def _deliver(r: Recipient, subject: str, body: str, details: dict[str, Any], set
 
 def send(recips: list[Recipient], subject: str, body: str, details: dict[str, Any],
          settings: dict[str, Any] | None = None) -> list[Delivery]:
-    """Send to every recipient. `settings` is the config's `notifications` block (smtp, ca_bundle, proxy)."""
+    """Send to every recipient. `settings` is the config's `notifications` block (mail, ca_bundle, proxy)."""
     settings = settings or {}
     results: list[Delivery] = []
     for r in recips:

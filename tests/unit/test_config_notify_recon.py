@@ -1,4 +1,8 @@
 import os
+import socketserver
+import sys
+import threading
+import types
 
 import pytest
 
@@ -149,3 +153,116 @@ def test_parse_reconciliation_errors(doc, problem):
 ])
 def test_recon_compare(check, s, t, status):
     assert _compare(check, s, t).status == status
+
+
+class _FakeSMTP(socketserver.StreamRequestHandler):
+    """Just enough SMTP for a relay test (no TLS, no login)."""
+    messages: list = []
+
+    def handle(self):
+        self.wfile.write(b"220 fake\r\n")
+        data = False
+        buf = []
+        for raw in self.rfile:
+            line = raw.decode().rstrip("\r\n")
+            if data:
+                if line == ".":
+                    data = False
+                    _FakeSMTP.messages.append("\n".join(buf))
+                    self.wfile.write(b"250 ok\r\n")
+                else:
+                    buf.append(line)
+                continue
+            cmd = line.split(" ")[0].upper()
+            if cmd in ("EHLO", "HELO"):
+                self.wfile.write(b"250 fake\r\n")
+            elif cmd == "DATA":
+                data = True
+                self.wfile.write(b"354 go\r\n")
+            elif cmd == "QUIT":
+                self.wfile.write(b"221 bye\r\n")
+                return
+            else:
+                self.wfile.write(b"250 ok\r\n")
+
+
+def test_smtp_relay_without_password():
+    server = socketserver.TCPServer(("127.0.0.1", 0), _FakeSMTP)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        mail = {"provider": "smtp-relay", "host": "127.0.0.1", "port": server.server_address[1],
+                "starttls": False, "user": "ignored", "from": "alerts@acme.com"}
+        out = notify.send([notify.Recipient("email", "team@acme.com", "source")], "subj", "body", {}, {"mail": mail})
+        assert out[0].status == "sent", out[0].error
+        assert "Subject: subj" in _FakeSMTP.messages[-1] and "alerts@acme.com" in _FakeSMTP.messages[-1]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_microsoft365_graph_without_password(webhook, monkeypatch):
+    monkeypatch.setattr(notify, "_graph_token", lambda mail: "token-from-managed-identity")
+    mail = {"provider": "microsoft365", "from": "alerts@acme.com", "graph_url": webhook.url}
+    out = notify.send([notify.Recipient("email", "team@acme.com", "source")], "subj", "body", {}, {"mail": mail})
+    assert out[0].status == "sent", out[0].error
+    call = webhook.calls[0]
+    assert call["path"] == "/users/alerts@acme.com/sendMail"
+    assert call["headers"]["Authorization"] == "Bearer token-from-managed-identity"
+    assert call["json"]["message"]["toRecipients"][0]["emailAddress"]["address"] == "team@acme.com"
+
+
+def test_aws_ses_with_iam_role(monkeypatch):
+    sent = {}
+
+    class Client:
+        def send_email(self, **kw):
+            sent.update(kw)
+
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=lambda name, region_name=None: Client()))
+    mail = {"provider": "aws-ses", "from": "alerts@acme.com", "region": "eu-north-1"}
+    out = notify.send([notify.Recipient("email", "team@acme.com", "source")], "subj", "body", {}, {"mail": mail})
+    assert out[0].status == "sent", out[0].error
+    assert sent["Destination"] == {"ToAddresses": ["team@acme.com"]} and sent["FromEmailAddress"] == "alerts@acme.com"
+
+
+def test_unknown_mail_provider_and_legacy_smtp_block():
+    out = notify.send([notify.Recipient("email", "a@b.com", "p")], "s", "b", {}, {"mail": {"provider": "fax"}})
+    assert out[0].status == "failed" and "unknown mail provider" in out[0].error
+    assert notify.mail_settings({"smtp": {"host": "x"}})["provider"] == "smtp"
+
+
+@pytest.fixture
+def memory_keyring():
+    keyring = pytest.importorskip("keyring")
+    from keyring.backend import KeyringBackend
+
+    class Memory(KeyringBackend):
+        priority = 1
+        store: dict = {}
+
+        def get_password(self, service, username):
+            return self.store.get((service, username))
+
+        def set_password(self, service, username, password):
+            self.store[(service, username)] = password
+
+        def delete_password(self, service, username):
+            del self.store[(service, username)]
+
+    previous = keyring.get_keyring()
+    keyring.set_keyring(Memory())
+    yield keyring
+    keyring.set_keyring(previous)
+
+
+def test_keychain_secrets(memory_keyring, monkeypatch, capsys):
+    from odcr.cli import main
+
+    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("s3cret\n"))
+    assert main(["secret", "set", "SMTP_PASSWORD", "--stdin"]) == 0
+    assert interpolate("${keyring:SMTP_PASSWORD}") == "s3cret"
+    assert main(["secret", "check", "SMTP_PASSWORD"]) == 0
+    assert main(["secret", "delete", "SMTP_PASSWORD"]) == 0
+    assert main(["secret", "check", "SMTP_PASSWORD"]) == 1
+    with pytest.warns(UserWarning, match="odcr secret set SMTP_PASSWORD"):
+        assert interpolate("${keyring:SMTP_PASSWORD}") == ""

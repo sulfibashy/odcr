@@ -34,7 +34,7 @@ def test_scaffold_every_adapter(adapter, tmp_path):
     repo = ContractRepository.from_config(config)
     assert list(repo.contracts) == ["orders"] and not repo.errors
     env = (root / ".env.example").read_text()
-    for var in ("ORDERS_SLACK_WEBHOOK", "SMTP_PASSWORD"):
+    for var in ("ORDERS_SLACK_WEBHOOK", "SMTP_HOST"):
         assert f"{var}=" in env
     compile((root / "jobs/ingestion_gate.py").read_text(), "ingestion_gate.py", "exec")
     yaml.safe_load((root / "reconciliations/orders.recon.yaml").read_text())
@@ -46,11 +46,12 @@ def test_scaffold_refuses_non_empty_dir_and_interactive(tmp_path):
     (tmp_path / "x" / "keep.txt").write_text("hi")
     with pytest.raises(FileExistsError):
         scaffold(tmp_path / "x")
-    answers = iter(["my_proj", str(PROMPT_ORDER.index("snowflake") + 1), "dq_meta", "email", "dq@example.com"])
+    answers = iter(["my_proj", str(PROMPT_ORDER.index("snowflake") + 1), "dq_meta", "email", "dq@example.com",
+                    "microsoft365", "alerts@acme.com"])
     scaffold(tmp_path / "y", interactive=True, reader=lambda _: next(answers))
     text = (tmp_path / "y" / "odcr.yaml").read_text()
     assert "name: my_proj" in text and "type: snowflake" in text and "schema: dq_meta" in text
-    assert "dq@example.com" in text
+    assert "dq@example.com" in text and "provider: microsoft365" in text and "from: alerts@acme.com" in text
 
 
 def write_contract(path: Path, cid: str, physical: str) -> None:
@@ -208,7 +209,7 @@ def test_adapter_typo_gets_a_suggestion(tmp_path):
 
 def test_init_creates_a_folder_named_after_the_project(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    answers = iter(["sales_contracts", "", "", "none"])
+    answers = iter(["sales_contracts", "", "", "none", "", ""])
     written = scaffold(None, adapter="postgres", interactive=True, reader=lambda _: next(answers))
     assert (tmp_path / "sales_contracts" / "odcr.yaml").exists()
     assert all(tmp_path / "sales_contracts" in p.parents for p in written)
@@ -243,3 +244,18 @@ def test_destroy_removes_the_project_safely(tmp_path, monkeypatch, capsys):
     assert main(["destroy", "--yes"]) == 2  # refuses while you are inside it
     monkeypatch.chdir(tmp_path)
     assert main(["destroy", "p2", "--yes"]) == 0 and not (tmp_path / "p2").exists()
+
+
+@pytest.mark.parametrize("provider,expected,secret", [
+    ("smtp-relay", "provider: smtp-relay", False), ("microsoft365", "provider: microsoft365", False),
+    ("aws-ses", "provider: aws-ses", False), ("smtp", "${keyring:SMTP_PASSWORD}", True),
+    ("gmail", "host: smtp.gmail.com", True)])
+def test_init_mail_providers(provider, expected, secret, tmp_path, capsys):
+    root = tmp_path / provider
+    assert main(["init", str(root), "--adapter", "postgres", "--no-input", "--mail", provider,
+                 "--mail-from", "alerts@acme.com", "--alerts-email", "platform@acme.com"]) == 0
+    text = (root / "odcr.yaml").read_text()
+    assert expected in text and "platform@acme.com" in text and "password: ${SMTP" not in text
+    assert "SMTP_PASSWORD=" not in (root / ".env.example").read_text()  # never a plain-text password
+    assert ("odcr secret set SMTP_PASSWORD" in capsys.readouterr().out) is secret
+    yaml.safe_load(text)

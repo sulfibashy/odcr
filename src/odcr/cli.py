@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from contextlib import ExitStack
 from pathlib import Path
@@ -60,15 +61,21 @@ def cmd_init(args: argparse.Namespace) -> int:
     if directory is None and not interactive:
         directory = "odcr_project"
     files = scaffold(directory, name=args.name, adapter=args.adapter, meta_schema=args.meta_schema,
-                     platform_channel=args.alerts, force=args.force, interactive=interactive)
+                     platform_channel=args.alerts, platform_target=args.alerts_email or "",
+                     mail_provider=args.mail, mail_from=args.mail_from or "", force=args.force,
+                     interactive=interactive)
     target = files[0].parent  # odcr.yaml sits in the project folder
     for f in files:
         print(f"  create {f.relative_to(target.parent)}")
     info = resolve(next(line.split(":", 1)[1].strip() for line in (target / "odcr.yaml").read_text().splitlines()
                         if line.strip().startswith("type:")))
     extra = f'"odcr[{info.extra}]"' if info.extra else "odcr"
+    config_text = (target / "odcr.yaml").read_text()
+    keychain = "".join(f"  odcr secret set {n}\n" for n in sorted(set(re.findall(r"\$\{keyring:([^}]+)\}",
+                                                                                   config_text))))
     print(f"\nCreated an odcr project for {info.title} in {target.resolve()}\n\nNext steps:\n"
           f"  cd {target.name if target.parent.resolve() == Path.cwd().resolve() else target}\n  pip install {extra}\n  cp .env.example .env      # then fill in the connection\n"
+          + keychain +
           "  odcr doctor -C main\n  odcr meta-init -C main\n  odcr seed -C main          # optional sample data\n"
           "  odcr run --contract-id orders -C main\n")
     return EXIT_OK
@@ -107,6 +114,38 @@ def cmd_destroy(args: argparse.Namespace) -> int:
             return EXIT_FAIL
     removed = remove_project(root)
     print(f"Deleted {root} ({removed} files). Start again with: odcr init")
+    return EXIT_OK
+
+
+def cmd_secret(args: argparse.Namespace) -> int:
+    """Store secrets in the OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)."""
+    try:
+        import keyring
+    except ImportError:
+        print("error: the OS keychain needs: pip install 'odcr[keyring]'", file=sys.stderr)
+        return EXIT_USAGE
+    from .config import KEYRING_SERVICE
+
+    if args.action == "set":
+        import getpass
+
+        value = sys.stdin.readline().rstrip("\n") if args.stdin else getpass.getpass(f"Value for {args.name}: ")
+        if not value:
+            print("error: empty value; nothing stored", file=sys.stderr)
+            return EXIT_USAGE
+        keyring.set_password(KEYRING_SERVICE, args.name, value)
+        print(f"Stored {args.name} in the OS keychain. Use it in odcr.yaml as ${{keyring:{args.name}}}")
+    elif args.action == "delete":
+        try:
+            keyring.delete_password(KEYRING_SERVICE, args.name)
+        except Exception:  # noqa: BLE001
+            print(f"{args.name} was not in the keychain")
+            return EXIT_FAIL
+        print(f"Deleted {args.name} from the OS keychain")
+    else:  # check
+        found = keyring.get_password(KEYRING_SERVICE, args.name) is not None
+        print(f"{args.name}: {'stored' if found else 'not stored'} (backend: {type(keyring.get_keyring()).__name__})")
+        return EXIT_OK if found else EXIT_FAIL
     return EXIT_OK
 
 
@@ -365,6 +404,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--meta-schema", default="odcr_meta")
     sp.add_argument("--alerts", default="email", choices=["slack", "teams", "email", "none"],
                     help="platform team alert channel")
+    sp.add_argument("--alerts-email", help="platform team email address")
+    sp.add_argument("--mail", choices=["smtp-relay", "microsoft365", "aws-ses", "smtp", "gmail"],
+                    help="how email is sent (default asks; smtp-relay with --no-input)")
+    sp.add_argument("--mail-from", help="sender address for email alerts")
     sp.add_argument("--no-input", action="store_true", help="do not ask questions; use the options and defaults")
     sp.add_argument("--force", action="store_true", help="write into a non-empty directory")
     sp.set_defaults(func=cmd_init)
@@ -374,6 +417,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("directory", nargs="?", help="project folder (default: the current folder)")
     sp.add_argument("--yes", "-y", action="store_true", help="do not ask for confirmation")
     sp.set_defaults(func=cmd_destroy)
+
+    sp = sub.add_parser("secret", help="store a password or token in the OS keychain (no plain-text secrets)")
+    sp.add_argument("action", choices=["set", "delete", "check"])
+    sp.add_argument("name", help="secret name, used in odcr.yaml as ${keyring:NAME}")
+    sp.add_argument("--stdin", action="store_true", help="read the value from standard input (for automation)")
+    sp.set_defaults(func=cmd_secret)
 
     sp = sub.add_parser("adapters", help="list supported platforms and how to install each")
     sp.add_argument("--json", action="store_true")

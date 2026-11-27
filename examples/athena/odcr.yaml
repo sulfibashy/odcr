@@ -1,5 +1,6 @@
-# odcr project configuration. ${VAR} and ${VAR:-default} come from environment variables;
-# ${file:/run/secrets/name} reads a secret file. Never put passwords or tokens in this file.
+# odcr project configuration. ${VAR} and ${VAR:-default} come from environment variables or .env;
+# ${file:/run/secrets/name} reads a secret file; ${keyring:NAME} reads the OS keychain (odcr secret set NAME).
+# Never put passwords or tokens in this file.
 name: athena_example
 
 # The central contract repository. A folder in this project, or a shared Git repository:
@@ -31,12 +32,13 @@ notifications:
   platform_team:
     - type: teams
       url: ${PLATFORM_TEAMS_WEBHOOK}
-  smtp:                      # used by email channels; TLS is verified with the system CA store
-    host: ${SMTP_HOST:-}        # e.g. smtp.office365.com, smtp.gmail.com
-    port: ${SMTP_PORT:-587}
-    starttls: true
-    user: ${SMTP_USER:-}
-    password: ${SMTP_PASSWORD:-}
-    from: odcr@example.com
+  # How email is sent (for platform_team and for contracts whose support channel is email).
+  # Providers: smtp-relay, microsoft365, aws-ses (no passwords), smtp / gmail (password in the OS keychain).
+  mail:                        # company relay: no password
+    provider: smtp-relay
+    host: ${SMTP_HOST:-smtp.example.com}
+    port: ${SMTP_PORT:-25}
+    starttls: true             # encrypt when the relay supports it
+    from: odcr-alerts@example.com
   # ca_bundle: /etc/ssl/certs/corporate-ca.pem   # private CA / TLS-inspecting proxy
   # proxy: http://proxy.example.com:8080

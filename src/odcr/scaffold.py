@@ -122,7 +122,54 @@ schema:
 {_custom_rule(info)}"""
 
 
-def config_yaml(info: AdapterInfo, platform_channel: str, platform_target: str, meta_schema: str) -> str:
+MAIL_PROVIDERS = {
+    "smtp-relay": "Company mail relay (SMTP, no login; the server is trusted by IP / network)",
+    "microsoft365": "Microsoft 365 / Exchange Online via Microsoft Graph (Entra ID managed identity, no password)",
+    "aws-ses": "Amazon SES (the machine's IAM role / SSO profile, no password)",
+    "smtp": "SMTP with login; the password is kept in the OS keychain",
+    "gmail": "Gmail / Google Workspace (app password kept in the OS keychain)",
+}
+
+
+def mail_yaml(provider: str, sender: str) -> str:
+    sender = sender or "odcr-alerts@example.com"
+    blocks = {
+        "smtp-relay": f"""  mail:                        # company relay: no password
+    provider: smtp-relay
+    host: ${{SMTP_HOST:-smtp.example.com}}
+    port: ${{SMTP_PORT:-25}}
+    starttls: true             # encrypt when the relay supports it
+    from: {sender}""",
+        "smtp": f"""  mail:                        # password from the OS keychain: odcr secret set SMTP_PASSWORD
+    provider: smtp
+    host: ${{SMTP_HOST:-smtp.example.com}}
+    port: ${{SMTP_PORT:-587}}
+    starttls: true
+    user: ${{SMTP_USER:-{sender}}}
+    password: ${{keyring:SMTP_PASSWORD}}
+    from: {sender}""",
+        "gmail": f"""  mail:                        # Gmail app password from the OS keychain: odcr secret set SMTP_PASSWORD
+    provider: smtp
+    host: smtp.gmail.com
+    port: 587
+    starttls: true
+    user: {sender}
+    password: ${{keyring:SMTP_PASSWORD}}
+    from: {sender}""",
+        "microsoft365": f"""  mail:                        # Microsoft Graph sendMail with Entra ID: no password stored anywhere
+    provider: microsoft365     # identity: managed identity, workload identity or `az login`
+    from: {sender}             # the mailbox the identity may send as (Graph Mail.Send permission)
+    # client_id: ${{AZURE_MANAGED_IDENTITY_CLIENT_ID}}   # user-assigned managed identity""",
+        "aws-ses": f"""  mail:                        # Amazon SES with the machine's IAM role / SSO profile: no password
+    provider: aws-ses
+    region: ${{AWS_REGION:-eu-north-1}}
+    from: {sender}             # a verified SES identity""",
+    }
+    return blocks[provider]
+
+
+def config_yaml(info: AdapterInfo, platform_channel: str, platform_target: str, meta_schema: str,
+                mail_provider: str = "smtp-relay", mail_from: str = "") -> str:
     conn = yaml.safe_dump({"main": info.connection}, sort_keys=False, default_flow_style=False).rstrip()
     conn = "\n".join("  " + line for line in conn.splitlines())
     channel = {
@@ -131,8 +178,9 @@ def config_yaml(info: AdapterInfo, platform_channel: str, platform_target: str, 
         "email": f"    - type: email\n      to: [{platform_target or 'data-platform@example.com'}]",
         "none": "    []",
     }.get(platform_channel, "    []")
-    return f"""# odcr project configuration. ${{VAR}} and ${{VAR:-default}} come from environment variables;
-# ${{file:/run/secrets/name}} reads a secret file. Never put passwords or tokens in this file.
+    return f"""# odcr project configuration. ${{VAR}} and ${{VAR:-default}} come from environment variables or .env;
+# ${{file:/run/secrets/name}} reads a secret file; ${{keyring:NAME}} reads the OS keychain (odcr secret set NAME).
+# Never put passwords or tokens in this file.
 name: {{name}}
 
 # The central contract repository. A folder in this project, or a shared Git repository:
@@ -157,25 +205,23 @@ notifications:
   # (The odcr command already prints results; add `- type: console` for library / Python API use.)
   platform_team:
 {channel}
-  smtp:                      # used by email channels; TLS is verified with the system CA store
-    host: ${{SMTP_HOST:-}}        # e.g. smtp.office365.com, smtp.gmail.com
-    port: ${{SMTP_PORT:-587}}
-    starttls: true
-    user: ${{SMTP_USER:-}}
-    password: ${{SMTP_PASSWORD:-}}
-    from: odcr@example.com
+  # How email is sent (for platform_team and for contracts whose support channel is email).
+  # Providers: smtp-relay, microsoft365, aws-ses (no passwords), smtp / gmail (password in the OS keychain).
+{mail_yaml(mail_provider, mail_from)}
   # ca_bundle: /etc/ssl/certs/corporate-ca.pem   # private CA / TLS-inspecting proxy
   # proxy: http://proxy.example.com:8080
 """
 
 
-def env_example(info: AdapterInfo) -> str:
-    text = yaml.safe_dump(info.connection) + "\nORDERS_SLACK_WEBHOOK ORDERS_TEAMS_WEBHOOK PLATFORM_SLACK_WEBHOOK " \
-                                             "PLATFORM_TEAMS_WEBHOOK SMTP_HOST SMTP_USER SMTP_PASSWORD"
-    names = sorted(set(re.findall(r"\$\{([A-Z0-9_]+)", text)) | set(re.findall(r"\b([A-Z][A-Z0-9_]{3,})\b", text.split("\n")[-1])))
-    lines = ["# Copy to .env (never commit it) or set these in your scheduler / secret store.",
-             f"# Connection: {info.title}"]
+def env_example(info: AdapterInfo, config_text: str = "") -> str:
+    text = yaml.safe_dump(info.connection) + "\n" + config_text
+    text += "\n${ORDERS_SLACK_WEBHOOK} ${ORDERS_TEAMS_WEBHOOK}"
+    names = sorted(set(re.findall(r"\$\{([A-Z][A-Z0-9_]+)", text)) - {"VAR", "NAME"})
     defaults = dict(re.findall(r"\$\{([A-Z0-9_]+):-([^}]*)\}", text))
+    lines = ["# Copy to .env (never commit it) or set these in your scheduler / secret store.",
+             "# Passwords: prefer the OS keychain over this file: odcr secret set PGPASSWORD, then in odcr.yaml",
+             "# write password: ${keyring:PGPASSWORD}. Managed identities / IAM roles need no password at all.",
+             f"# Connection: {info.title}"]
     lines += [f"{n}={defaults.get(n, '')}" for n in names]
     return "\n".join(lines) + "\n"
 
@@ -379,6 +425,7 @@ def ask(prompt: str, default: str, options: list[str] | None = None,
 
 def scaffold(directory: str | Path | None = None, *, name: str | None = None, adapter: str | None = None,
              meta_schema: str = "odcr_meta", platform_channel: str = "email", platform_target: str = "",
+             mail_provider: str | None = None, mail_from: str = "",
              force: bool = False, interactive: bool = False, reader: Callable[[str], str] = input) -> list[Path]:
     """Create the project in its own folder. Returns the files written.
 
@@ -407,15 +454,28 @@ def scaffold(directory: str | Path | None = None, *, name: str | None = None, ad
         if platform_channel == "email":
             platform_target = ask("Platform team email", platform_target or "data-platform@example.com",
                                   reader=reader)
+        if mail_provider is None:
+            print("\nHow should odcr send email alerts?")
+            keys = list(MAIL_PROVIDERS)
+            for i, key in enumerate(keys, 1):
+                print(f"  {i}. {key:<13} {MAIL_PROVIDERS[key]}")
+            mail_provider = ask("Mail provider", "smtp-relay", keys, reader=reader)
+        if not mail_from:
+            mail_from = ask("Send alerts from (email address)", "odcr-alerts@example.com", reader=reader)
     info = resolve(adapter or "duckdb")
+    mail_provider = mail_provider or "smtp-relay"
+    if mail_provider not in MAIL_PROVIDERS:
+        raise ValueError(f"mail provider must be one of: {', '.join(MAIL_PROVIDERS)}")
     if root is None:
         root = Path.cwd() / (name or "odcr_project")
     name = name or root.name or "odcr_project"
     if root.exists() and any(root.iterdir()) and not force:
         raise FileExistsError(f"{root} is not empty; use --force to write into it")
+    config_text = config_yaml(info, platform_channel, platform_target, meta_schema, mail_provider,
+                              mail_from).replace("{name}", name)
     files: dict[str, str] = {
-        "odcr.yaml": config_yaml(info, platform_channel, platform_target, meta_schema).replace("{name}", name),
-        ".env.example": env_example(info),
+        "odcr.yaml": config_text,
+        ".env.example": env_example(info, config_text),
         "contracts/sales/orders.odcs.yaml": contract_yaml(info),
         "reconciliations/orders.recon.yaml": recon_yaml(info),
         "seeds/orders.csv": samples.csv_text(),

@@ -14,6 +14,25 @@ from .meta import DEFAULT_META_SCHEMA
 
 _ENV = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 _FILE = re.compile(r"\$\{file:([^}]+)\}")
+_KEYRING = re.compile(r"\$\{keyring:([^}]+)\}")
+KEYRING_SERVICE = "odcr"
+
+
+def keyring_get(name: str) -> str:
+    """A secret from the OS keychain (macOS Keychain, Windows Credential Manager, Secret Service on Linux)."""
+    import warnings
+
+    try:
+        import keyring
+    except ImportError:
+        warnings.warn(f"${{keyring:{name}}} needs: pip install 'odcr[keyring]'", stacklevel=2)
+        return ""
+    value = keyring.get_password(KEYRING_SERVICE, name)
+    if value is None:  # not fatal: only the connection or channel that uses it will fail
+        warnings.warn(f"secret '{name}' is not in the OS keychain; store it with: odcr secret set {name}",
+                      stacklevel=2)
+        return ""
+    return value
 
 
 class ConfigError(ValueError):
@@ -21,9 +40,11 @@ class ConfigError(ValueError):
 
 
 def interpolate(value: Any) -> Any:
-    """Resolve ${VAR}, ${VAR:-default} and ${file:/path/to/secret} (Docker / Kubernetes secrets)."""
+    """Resolve ${VAR}, ${VAR:-default}, ${file:/path/to/secret} (Docker / Kubernetes secrets) and
+    ${keyring:NAME} (the OS keychain; store with `odcr secret set NAME`)."""
     if isinstance(value, str):
         value = _FILE.sub(lambda m: Path(os.path.expanduser(m.group(1))).read_text(encoding="utf-8").strip(), value)
+        value = _KEYRING.sub(lambda m: keyring_get(m.group(1).strip()), value)
         def sub(m: re.Match[str]) -> str:
             name, default = m.group(1), m.group(2)
             value = os.environ.get(name)

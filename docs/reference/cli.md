@@ -8,7 +8,9 @@ create a new odcr project (like dbt init)
 
 ```text
 usage: odcr init [-h] [--adapter ADAPTER] [--name NAME] [--meta-schema META_SCHEMA]
-                 [--alerts {slack,teams,email,none}] [--no-input] [--force]
+                 [--alerts {slack,teams,email,none}] [--alerts-email ALERTS_EMAIL]
+                 [--mail {smtp-relay,microsoft365,aws-ses,smtp,gmail}] [--mail-from MAIL_FROM]
+                 [--no-input] [--force]
                  [directory]
 
 positional arguments:
@@ -22,6 +24,12 @@ options:
   --meta-schema META_SCHEMA
   --alerts {slack,teams,email,none}
                         platform team alert channel
+  --alerts-email ALERTS_EMAIL
+                        platform team email address
+  --mail {smtp-relay,microsoft365,aws-ses,smtp,gmail}
+                        how email is sent (default asks; smtp-relay with --no-input)
+  --mail-from MAIL_FROM
+                        sender address for email alerts
   --no-input            do not ask questions; use the options and defaults
   --force               write into a non-empty directory
 ```
@@ -39,6 +47,22 @@ positional arguments:
 options:
   -h, --help  show this help message and exit
   --yes, -y   do not ask for confirmation
+```
+
+## odcr secret
+
+store a password or token in the OS keychain (no plain-text secrets)
+
+```text
+usage: odcr secret [-h] [--stdin] {set,delete,check} name
+
+positional arguments:
+  {set,delete,check}
+  name                secret name, used in odcr.yaml as ${keyring:NAME}
+
+options:
+  -h, --help          show this help message and exit
+  --stdin             read the value from standard input (for automation)
 ```
 
 ## odcr adapters
