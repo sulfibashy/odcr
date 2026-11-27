@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odcr-trino"
-version = "0.2.2"
+version = "0.2.3.dev0"
 description = "odcr connector for Trino / Starburst / Presto: installs odcr with the trino driver."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,7 @@ license = "Apache-2.0"
 authors = [{ name = "sulfibashy" }, { name = "odcr contributors" }]
 keywords = ["data contracts", "ODCS", "data quality", "odcr", "trino"]
 classifiers = ["Programming Language :: Python :: 3", "Operating System :: OS Independent", "Topic :: Database"]
-dependencies = ["odcr[trino]==0.2.2"]
+dependencies = ["odcr[trino]==0.2.3.dev0"]
 
 [project.urls]
 Homepage = "https://github.com/sulfibashy/odcr"
