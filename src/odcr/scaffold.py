@@ -352,7 +352,7 @@ steps:
 """
 
 def azdo_pipeline(info: AdapterInfo) -> str:
-    extra = f"odcr[{info.extra}]" if info.extra else "odcr"
+    extra = info.package
     where = info.where_example.replace("{batch_id}", "$(LOAD_ID)").replace('"', '\\"')
     return f"""# Azure DevOps: ingestion -> contract gate -> transformation -> output gate.
 # Copy into your pipeline repository and adapt. Secrets come from a variable group (Key Vault-linked).
@@ -390,7 +390,7 @@ stages:
         steps:
           - task: UsePythonVersion@0
             inputs: {{versionSpec: "3.12"}}
-          - script: pip install "{extra}"
+          - script: pip install {extra}
           - script: |
               odcr run --contract-id orders --batch-id "$(LOAD_ID)" \\
                 --where "{where}" --pipeline orders --stage ingestion
@@ -412,7 +412,7 @@ stages:
     jobs:
       - job: odcr
         steps:
-          - script: pip install "{extra}"
+          - script: pip install {extra}
           - script: |
               odcr run --contract-id orders_gold --batch-id "$(LOAD_ID)" --pipeline orders --stage gold
             env:
@@ -421,7 +421,7 @@ stages:
 
 
 def github_pipeline(info: AdapterInfo) -> str:
-    extra = f"odcr[{info.extra}]" if info.extra else "odcr"
+    extra = info.package
     where = info.where_example.replace("{batch_id}", "${{ inputs.load_id }}").replace('"', '\\"')
     return f"""# GitHub Actions: ingestion -> contract gate -> transformation.
 # Copy to .github/workflows/ in your pipeline repository and adapt.
@@ -449,7 +449,7 @@ jobs:
       - uses: actions/checkout@v7          # this repository: odcr.yaml
       - uses: actions/setup-python@v7
         with: {{python-version: "3.12"}}
-      - run: pip install "{extra}"
+      - run: pip install {extra}
       - run: |
           odcr run --contract-id orders --batch-id "${{{{ inputs.load_id }}}}" \\
             --where "{where}" --pipeline orders --stage ingestion
@@ -483,7 +483,7 @@ def shell_arg(text: str) -> str:
 def readme(name: str, info: AdapterInfo) -> str:
     w1 = shell_arg(info.where_example.replace("{batch_id}", "batch-001"))
     w2 = shell_arg(info.where_example.replace("{batch_id}", "batch-002"))
-    extra = f'"odcr[{info.extra}]"' if info.extra else "odcr"
+    extra = info.package
     return f"""# {name}
 
 Data contracts and data quality checks with [odcr](https://github.com/sulfibashy/odcr) on **{info.title}**.
@@ -620,8 +620,7 @@ def scaffold(directory: str | Path | None = None, *, name: str | None = None, ad
 
 
 def describe(info: AdapterInfo) -> dict[str, Any]:
-    return {"name": info.name, "title": info.title, "install": f"pip install \"odcr[{info.extra}]\"" if info.extra
-            else "pip install odcr"}
+    return {"name": info.name, "title": info.title, "install": info.install}
 
 
 def find_project(directory: str | Path | None = None) -> Path:

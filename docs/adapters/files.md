@@ -6,7 +6,7 @@ Checks Parquet, CSV and JSON files where they land, before loading (DuckDB engin
 | --- | --- |
 | Adapter name | `files` (aliases: `adls`, `azure-storage`, `s3`, `gcs`, `landing`, `parquet`, `csv`) |
 | Runs on | local, network shares, Azure ADLS Gen2/Blob, AWS S3, GCP GCS, MinIO |
-| Install | `pip install "odcr[files]"` |
+| Install | `pip install odcr-files` |
 | Python driver | `duckdb` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ Checks Parquet, CSV and JSON files where they land, before loading (DuckDB engin
 ## Create a project
 
 ```bash
-pip install "odcr[files]"
+pip install odcr-files
 odcr init my_contracts --adapter files
 cd my_contracts
 ```

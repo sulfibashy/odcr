@@ -27,3 +27,17 @@ def test_adapter_docs_are_up_to_date(tmp_path):
     for page in (tmp_path / "adapters").glob("*.md"):
         current = (ROOT / "docs" / "adapters" / page.name).read_text(encoding="utf-8")
         assert current == page.read_text(encoding="utf-8"), f"run: python scripts/generate_docs.py ({page.name})"
+
+
+def test_connector_packages_are_up_to_date(tmp_path):
+    spec = importlib.util.spec_from_file_location("conn", ROOT / "scripts" / "build_connectors.py")
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    gen.generate(out=tmp_path)
+    names = sorted(p.name for p in tmp_path.iterdir())
+    assert names == sorted(p.name for p in (ROOT / "connectors").iterdir()), "run: python scripts/build_connectors.py"
+    for name in names:
+        for f in ("pyproject.toml", "README.md"):
+            assert (tmp_path / name / f).read_text() == (ROOT / "connectors" / name / f).read_text(), \
+                f"connectors/{name}/{f} is stale: run python scripts/build_connectors.py"
+    assert "odcr-postgres" in names and "odcr-all" in names and "odcr-synapse" in names

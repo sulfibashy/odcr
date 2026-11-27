@@ -1,6 +1,6 @@
 # Databricks (Workflows, Auto Loader, DLT)
 
-Install as a job or cluster library: `odcr[databricks]` (PyPI). Store `odcr.yaml` and the contract repository in
+Install as a job or cluster library: `odcr-databricks` (PyPI). Store `odcr.yaml` and the contract repository in
 a Git folder / workspace files, and the token in a secret scope.
 
 **Workflow task after the load:**

@@ -6,7 +6,7 @@ Fabric Warehouse and SQL analytics endpoints.
 | --- | --- |
 | Adapter name | `fabric` (aliases: none) |
 | Runs on | Azure |
-| Install | `pip install "odcr[sqlserver]"` |
+| Install | `pip install odcr-fabric` |
 | Python driver | `pyodbc` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_FABRIC`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ Fabric Warehouse and SQL analytics endpoints.
 ## Create a project
 
 ```bash
-pip install "odcr[sqlserver]"
+pip install odcr-fabric
 odcr init my_contracts --adapter fabric
 cd my_contracts
 ```

@@ -55,7 +55,7 @@ stages:
         steps:
           - task: UsePythonVersion@0
             inputs: {versionSpec: "3.12"}
-          - script: pip install "odcr[databricks]"
+          - script: pip install odcr-databricks
           - script: |
               odcr run --contract-id orders --batch-id "$(LOAD_ID)" \
                 --where "load_id = '$(LOAD_ID)'" --pipeline orders --stage ingestion
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with: {python-version: "3.12"}
-      - run: pip install "odcr[snowflake]"
+      - run: pip install odcr-snowflake
       - run: |
           odcr run --contracts https://github.com/acme/data-contracts.git --contract-id orders \
             --batch-id "${{ inputs.load_id }}" --where "load_id = '${{ inputs.load_id }}'"

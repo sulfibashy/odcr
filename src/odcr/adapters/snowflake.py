@@ -21,7 +21,7 @@ class SnowflakeAdapter(Adapter):
         try:
             import snowflake.connector
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Snowflake support needs: pip install 'odcr[snowflake]'") from exc
+            raise ImportError("Snowflake support needs: pip install odcr-snowflake") from exc
         o = {k: v for k, v in self.options.items() if k in _CONNECT_KEYS and v not in (None, "")}
         if "username" in self.options and "user" not in o:
             o["user"] = self.options["username"]

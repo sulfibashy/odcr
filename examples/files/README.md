@@ -5,7 +5,7 @@ Data contracts and data quality checks with [odcr](https://github.com/sulfibashy
 ## Setup
 
 ```bash
-pip install "odcr[files]"
+pip install odcr-files
 cp .env.example .env        # fill in connection details (Windows: copy .env.example .env)
 odcr doctor -C main         # test the connection, TLS and permissions
 odcr meta-init -C main      # create the meta tables

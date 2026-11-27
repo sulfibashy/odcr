@@ -44,7 +44,7 @@ class MongoDBAdapter(DocumentAdapter):
             try:
                 import pymongo
             except ImportError as exc:  # pragma: no cover
-                raise ImportError("MongoDB support needs: pip install 'odcr[mongodb]'") from exc
+                raise ImportError("MongoDB support needs: pip install odcr-mongodb") from exc
             uri = o.get("uri") or f"mongodb://{o.get('host', 'localhost')}:{int(o.get('port', 27017))}"
             kwargs = {k: o[k] for k in ("username", "password", "authSource", "tls") if k in o}
             client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=int(o.get("timeout_ms", 5000)), **kwargs)

@@ -56,7 +56,7 @@ class CosmosDBAdapter(DocumentAdapter):
         try:
             from azure.cosmos import CosmosClient
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Cosmos DB support needs: pip install 'odcr[cosmosdb]'") from exc
+            raise ImportError("Cosmos DB support needs: pip install odcr-cosmosdb") from exc
         o = self.options
         if o.get("connection_string"):
             return CosmosClient.from_connection_string(o["connection_string"])

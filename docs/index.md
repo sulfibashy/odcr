@@ -16,7 +16,7 @@ or file drops. Each load unit has a `batch_id`, and odcr:
 6. **traces** each batch from source to consumption and flags where rows were lost.
 
 ```bash
-pip install "odcr[postgres]"          # or snowflake, databricks, sqlserver, mongodb, files, ... (18 adapters)
+pip install odcr-postgres          # or snowflake, databricks, sqlserver, mongodb, files, ... (18 adapters)
 odcr init my_contracts --adapter postgres
 cd my_contracts && odcr doctor && odcr run --contract-id orders
 ```

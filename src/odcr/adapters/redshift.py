@@ -16,7 +16,7 @@ class RedshiftAdapter(PostgresAdapter):
         try:
             import redshift_connector
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Redshift support needs: pip install 'odcr[redshift]'") from exc
+            raise ImportError("Redshift support needs: pip install odcr-redshift") from exc
         o = {k: v for k, v in self.options.items() if k not in ("schema",)}
         o["port"] = int(o.get("port", 5439))
         if "username" in o:

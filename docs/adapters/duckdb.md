@@ -6,7 +6,7 @@ Embedded analytics database; also checks Parquet/CSV/JSON files directly.
 | --- | --- |
 | Adapter name | `duckdb` (aliases: none) |
 | Runs on | local, MotherDuck |
-| Install | `pip install "odcr[duckdb]"` |
+| Install | `pip install odcr-duckdb` |
 | Python driver | `duckdb` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ Embedded analytics database; also checks Parquet/CSV/JSON files directly.
 ## Create a project
 
 ```bash
-pip install "odcr[duckdb]"
+pip install odcr-duckdb
 odcr init my_contracts --adapter duckdb
 cd my_contracts
 ```

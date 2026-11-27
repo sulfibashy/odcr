@@ -6,7 +6,7 @@ Databricks SQL warehouses and clusters; Unity Catalog and hive_metastore; Delta 
 | --- | --- |
 | Adapter name | `databricks` (aliases: `azure-databricks`, `aws-databricks`, `gcp-databricks`) |
 | Runs on | Azure, AWS, GCP |
-| Install | `pip install "odcr[databricks]"` |
+| Install | `pip install odcr-databricks` |
 | Python driver | `databricks.sql` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_DATABRICKS`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ Databricks SQL warehouses and clusters; Unity Catalog and hive_metastore; Delta 
 ## Create a project
 
 ```bash
-pip install "odcr[databricks]"
+pip install odcr-databricks
 odcr init my_contracts --adapter databricks
 cd my_contracts
 ```

@@ -16,7 +16,7 @@ class PostgresAdapter(Adapter):
         try:
             import psycopg
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("PostgreSQL support needs: pip install 'odcr[postgres]'") from exc
+            raise ImportError("PostgreSQL support needs: pip install odcr-postgres") from exc
         o = self.options
         if o.get("dsn"):
             conn = psycopg.connect(o["dsn"], autocommit=True)

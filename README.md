@@ -35,7 +35,7 @@ For every batch, micro-batch or file, odcr:
 ## Quickstart
 
 ```bash
-pip install "odcr[postgres]"                     # pick your platform: odcr adapters
+pip install odcr-postgres                     # pick your platform: odcr adapters
 odcr init my_contracts --adapter postgres        # creates a full project, like dbt init
 cd my_contracts
 cp .env.example .env                             # fill in the connection (Windows: copy)
@@ -64,15 +64,15 @@ odcr watch --contract-id orders -C lake                          # every new fil
 
 | | Platforms | Install |
 | --- | --- | --- |
-| **Files** | Parquet / CSV / JSON in local folders, network shares, **ADLS Gen2**, Azure Blob, **S3**, **GCS**, MinIO | `odcr[files]` |
-| **Embedded** | DuckDB, SQLite | `odcr[duckdb]`, `odcr` |
-| **On-premise / open source** | PostgreSQL, MySQL, MariaDB, **SQL Server**, **Oracle**, **IBM Db2**, Trino / Starburst / Presto | `odcr[postgres]` `[mysql]` `[sqlserver]` `[oracle]` `[db2]` `[trino]` |
-| **Azure** | **Databricks**, **Synapse Analytics**, **Fabric Warehouse**, Azure SQL, **Cosmos DB**, Azure PostgreSQL / MySQL | `odcr[databricks]` `[synapse]` `[fabric]` `[sqlserver]` `[cosmosdb]` |
-| **AWS** | Databricks, **Redshift**, **Athena**, Aurora / RDS, DocumentDB | `odcr[databricks]` `[redshift]` `[athena]` `[postgres]` `[mongodb]` |
-| **GCP** | Databricks, **BigQuery**, Cloud SQL, AlloyDB | `odcr[databricks]` `[bigquery]` `[postgres]` |
-| **Multi-cloud** | **Snowflake**, **MongoDB** / Atlas | `odcr[snowflake]` `[mongodb]` |
+| **Files** | Parquet / CSV / JSON in local folders, network shares, **ADLS Gen2**, Azure Blob, **S3**, **GCS**, MinIO | `odcr-files` |
+| **Embedded** | DuckDB, SQLite | `odcr-duckdb`, `odcr` |
+| **On-premise / open source** | PostgreSQL, MySQL, MariaDB, **SQL Server**, **Oracle**, **IBM Db2**, Trino / Starburst / Presto | `odcr-postgres` `odcr-mysql` `odcr-sqlserver` `odcr-oracle` `odcr-db2` `odcr-trino` |
+| **Azure** | **Databricks**, **Synapse Analytics**, **Fabric Warehouse**, Azure SQL, **Cosmos DB**, Azure PostgreSQL / MySQL | `odcr-databricks` `odcr-synapse` `odcr-fabric` `odcr-sqlserver` `odcr-cosmosdb` |
+| **AWS** | Databricks, **Redshift**, **Athena**, Aurora / RDS, DocumentDB | `odcr-databricks` `odcr-redshift` `odcr-athena` `odcr-postgres` `odcr-mongodb` |
+| **GCP** | Databricks, **BigQuery**, Cloud SQL, AlloyDB | `odcr-databricks` `odcr-bigquery` `odcr-postgres` |
+| **Multi-cloud** | **Snowflake**, **MongoDB** / Atlas | `odcr-snowflake` `odcr-mongodb` |
 
-18 adapters; `pip install "odcr[all]"` installs every driver. Each has a ready-to-run reference project in
+18 adapters; `pip install odcr-all` installs every driver. Each has a ready-to-run reference project in
 [`examples/`](examples/) and a [documentation page](https://sulfibashy.github.io/odcr/adapters/).
 **Informatica, Ab Initio, Azure Data Factory, SSIS, Airflow and Databricks Workflows** call odcr after they land
 data — see [Integrations](https://sulfibashy.github.io/odcr/integrations/).

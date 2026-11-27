@@ -34,7 +34,7 @@ stages:
         steps:
           - task: UsePythonVersion@0
             inputs: {versionSpec: "3.12"}
-          - script: pip install "odcr[postgres]"
+          - script: pip install odcr-postgres
           - script: |
               odcr run --contract-id orders --batch-id "$(LOAD_ID)" \
                 --where "load_id = '$(LOAD_ID)'" --pipeline orders --stage ingestion
@@ -56,7 +56,7 @@ stages:
     jobs:
       - job: odcr
         steps:
-          - script: pip install "odcr[postgres]"
+          - script: pip install odcr-postgres
           - script: |
               odcr run --contract-id orders_gold --batch-id "$(LOAD_ID)" --pipeline orders --stage gold
             env:

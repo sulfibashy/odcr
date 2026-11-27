@@ -6,7 +6,7 @@ Redshift provisioned and Serverless (password or IAM).
 | --- | --- |
 | Adapter name | `redshift` (aliases: none) |
 | Runs on | AWS |
-| Install | `pip install "odcr[redshift]"` |
+| Install | `pip install odcr-redshift` |
 | Python driver | `redshift_connector` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_REDSHIFT`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ Redshift provisioned and Serverless (password or IAM).
 ## Create a project
 
 ```bash
-pip install "odcr[redshift]"
+pip install odcr-redshift
 odcr init my_contracts --adapter redshift
 cd my_contracts
 ```

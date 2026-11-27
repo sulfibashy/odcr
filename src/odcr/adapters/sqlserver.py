@@ -31,14 +31,14 @@ class SQLServerAdapter(Adapter):
             try:
                 import pytds
             except ImportError as exc:  # pragma: no cover
-                raise ImportError("SQL Server (pytds) support needs: pip install 'odcr[sqlserver]'") from exc
+                raise ImportError("SQL Server (pytds) support needs: pip install odcr-sqlserver") from exc
             return pytds.connect(server=o.get("host", "localhost"), port=int(o.get("port", 1433)),
                                  database=o.get("database", "master"), user=o.get("user") or o.get("username"),
                                  password=o.get("password", ""), autocommit=True)
         try:
             import pyodbc
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("SQL Server support needs: pip install 'odcr[sqlserver]' and the Microsoft "
+            raise ImportError("SQL Server support needs: pip install odcr-sqlserver and the Microsoft "
                               "ODBC Driver 18, or set client: pytds") from exc
         if o.get("connection_string"):
             return pyodbc.connect(o["connection_string"], autocommit=True)

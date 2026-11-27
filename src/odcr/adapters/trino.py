@@ -19,7 +19,7 @@ class TrinoAdapter(Adapter):
         try:
             import trino
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Trino support needs: pip install 'odcr[trino]'") from exc
+            raise ImportError("Trino support needs: pip install odcr-trino") from exc
         o = self.options
         auth = None
         if o.get("password"):

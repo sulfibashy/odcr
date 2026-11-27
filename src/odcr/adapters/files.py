@@ -38,7 +38,7 @@ class FilesAdapter(DuckDBAdapter):
         try:
             import duckdb
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("File support needs: pip install 'odcr[files]'") from exc
+            raise ImportError("File support needs: pip install odcr-files") from exc
         conn = duckdb.connect(str(self.options.get("meta_path") or ":memory:"))
         self._configure_storage(conn)
         return conn

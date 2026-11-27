@@ -6,7 +6,7 @@ PostgreSQL and PostgreSQL-compatible databases.
 | --- | --- |
 | Adapter name | `postgres` (aliases: `postgresql`, `aurora-postgres`, `azure-postgres`, `cloudsql-postgres`, `alloydb`, `supabase`, `neon`) |
 | Runs on | on-premise, AWS RDS/Aurora, Azure, GCP Cloud SQL/AlloyDB |
-| Install | `pip install "odcr[postgres]"` |
+| Install | `pip install odcr-postgres` |
 | Python driver | `psycopg` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ PostgreSQL and PostgreSQL-compatible databases.
 ## Create a project
 
 ```bash
-pip install "odcr[postgres]"
+pip install odcr-postgres
 odcr init my_contracts --adapter postgres
 cd my_contracts
 ```

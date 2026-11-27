@@ -2,36 +2,47 @@
 
 odcr is a pure-Python package (Python 3.10–3.13). It runs anywhere Python runs: Windows, macOS, Linux and
 Unix servers (AIX, Solaris and others through the database drivers available there), containers, Kubernetes,
-Databricks clusters, Azure Functions and AWS Lambda. The core depends only on PyYAML; each platform adds
-its own driver through an *extra*.
+Databricks clusters, Azure Functions and AWS Lambda.
 
-## Choose your adapters
+## Install the connector for your platform
+
+Like `dbt-postgres` or `dbt-snowflake`, every platform has its own package. It installs odcr plus that
+platform's driver — no brackets, no quotes:
 
 ```bash
-pip install "odcr[postgres]"                  # one platform
-pip install "odcr[snowflake,databricks]"      # several
-pip install "odcr[all]"                       # every driver
-odcr adapters                                 # what is supported and what is installed
+pip install odcr-postgres                       # one platform
+pip install odcr-snowflake odcr-databricks      # several
+pip install odcr-all                            # every driver
+odcr adapters                                   # what is supported and what is installed
 ```
 
-| Extra | Platforms |
+| Package | Platforms |
 | --- | --- |
-| `duckdb`, `files` | DuckDB; Parquet / CSV / JSON in local folders, ADLS Gen2, Blob, S3, GCS |
-| *(none)* | SQLite |
-| `postgres` | PostgreSQL, Aurora / RDS, Azure Database for PostgreSQL, Cloud SQL, AlloyDB |
-| `mysql` | MySQL, MariaDB, Aurora / RDS, Azure Database for MySQL, Cloud SQL |
-| `sqlserver` | SQL Server, Azure SQL Database / Managed Instance, Synapse, Fabric Warehouse |
-| `oracle` | Oracle Database, Autonomous Database |
-| `db2` | IBM Db2 LUW, Db2 on Cloud, Db2 Warehouse |
-| `trino` | Trino, Starburst, Presto |
-| `snowflake` | Snowflake |
-| `databricks` | Databricks on Azure, AWS and GCP |
-| `bigquery` | Google BigQuery |
-| `redshift` | Amazon Redshift |
-| `athena` | Amazon Athena |
-| `mongodb` | MongoDB, Atlas, Amazon DocumentDB, Cosmos DB for MongoDB |
-| `cosmosdb` | Azure Cosmos DB for NoSQL |
-| `lint` | the official Data Contract CLI, for extra contract linting |
+| `odcr` | the core, plus SQLite (built into Python) |
+| `odcr-duckdb` | DuckDB, MotherDuck |
+| `odcr-files` | Parquet / CSV / JSON in local folders, network shares, ADLS Gen2, Azure Blob, S3, GCS, MinIO |
+| `odcr-postgres` | PostgreSQL, Aurora / RDS, Azure Database for PostgreSQL, Cloud SQL, AlloyDB |
+| `odcr-mysql` | MySQL, MariaDB, Aurora / RDS, Azure Database for MySQL, Cloud SQL |
+| `odcr-sqlserver` | SQL Server, Azure SQL Database, Azure SQL Managed Instance |
+| `odcr-synapse` | Azure Synapse Analytics (dedicated SQL pools) |
+| `odcr-fabric` | Microsoft Fabric Warehouse |
+| `odcr-oracle` | Oracle Database, Autonomous Database |
+| `odcr-db2` | IBM Db2 LUW, Db2 on Cloud, Db2 Warehouse |
+| `odcr-trino` | Trino, Starburst, Presto |
+| `odcr-snowflake` | Snowflake |
+| `odcr-databricks` | Databricks on Azure, AWS and GCP |
+| `odcr-bigquery` | Google BigQuery |
+| `odcr-redshift` | Amazon Redshift |
+| `odcr-athena` | Amazon Athena |
+| `odcr-mongodb` | MongoDB, Atlas, Amazon DocumentDB, Cosmos DB for MongoDB |
+| `odcr-cosmosdb` | Azure Cosmos DB for NoSQL |
+| `odcr-all` | every driver above |
+
+The equivalent "extras" form also works: `pip install "odcr[postgres]"`. In zsh (the macOS default shell) the
+brackets must be quoted; the `odcr-<platform>` packages avoid that.
+
+Optional features: `pip install "odcr[keyring]"` (OS keychain secrets), `"odcr[microsoft365]"` (email via
+Microsoft Graph), `"odcr[aws-ses]"` (email via Amazon SES), `"odcr[lint]"` (Data Contract CLI linting).
 
 ## Per operating system
 
@@ -39,7 +50,7 @@ odcr adapters                                 # what is supported and what is in
 
     ```bash
     python3 -m venv /opt/odcr/venv
-    /opt/odcr/venv/bin/pip install "odcr[postgres]"
+    /opt/odcr/venv/bin/pip install odcr-postgres
     /opt/odcr/venv/bin/odcr --version
     ```
 
@@ -50,7 +61,7 @@ odcr adapters                                 # what is supported and what is in
 
     ```powershell
     py -m venv C:\odcr\venv
-    C:\odcr\venv\Scripts\pip install "odcr[sqlserver]"
+    C:\odcr\venv\Scripts\pip install odcr-sqlserver
     C:\odcr\venv\Scripts\odcr --version
     ```
 
@@ -61,13 +72,13 @@ odcr adapters                                 # what is supported and what is in
 
     ```bash
     brew install python@3.12
-    python3 -m venv ~/.odcr && ~/.odcr/bin/pip install "odcr[snowflake]"
+    python3 -m venv ~/.odcr && ~/.odcr/bin/pip install odcr-snowflake
     ```
 
 === "pipx (CLI only)"
 
     ```bash
-    pipx install "odcr[postgres]"
+    pipx install odcr-postgres
     ```
 
 ## Servers without internet access
@@ -75,14 +86,14 @@ odcr adapters                                 # what is supported and what is in
 Build a wheelhouse on a machine with access, copy it over, and install offline:
 
 ```bash
-pip download "odcr[postgres,sqlserver]" -d wheelhouse --platform manylinux2014_x86_64 --only-binary=:all: --python-version 3.12
-pip install --no-index --find-links wheelhouse "odcr[postgres,sqlserver]"
+pip download odcr-postgres odcr-sqlserver -d wheelhouse --platform manylinux2014_x86_64 --only-binary=:all: --python-version 3.12
+pip install --no-index --find-links wheelhouse odcr-postgres odcr-sqlserver
 ```
 
 ## Behind a corporate proxy or with a private CA
 
 ```bash
-pip install --proxy http://proxy.example.com:8080 --cert /etc/ssl/certs/corporate-ca.pem "odcr[all]"
+pip install --proxy http://proxy.example.com:8080 --cert /etc/ssl/certs/corporate-ca.pem odcr-all
 ```
 
 At run time, see [Security](../security.md): every connection verifies TLS certificates, and a corporate CA
@@ -97,5 +108,5 @@ docker run --rm -v "$PWD:/work" -w /work --env-file .env odcr run --contract-id 
 
 ## Databricks, Azure Functions, AWS Lambda
 
-`%pip install "odcr[databricks]"` in a notebook or as a cluster / job library; add `odcr[...]` to
+`%pip install odcr-databricks` in a notebook or as a cluster / job library; add `odcr-<adapter>` to
 `requirements.txt` for Functions and Lambda. Call the [Python API](../reference/python-api.md).

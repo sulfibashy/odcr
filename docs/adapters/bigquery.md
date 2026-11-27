@@ -6,7 +6,7 @@ BigQuery with Application Default Credentials or a key file.
 | --- | --- |
 | Adapter name | `bigquery` (aliases: none) |
 | Runs on | GCP |
-| Install | `pip install "odcr[bigquery]"` |
+| Install | `pip install odcr-bigquery` |
 | Python driver | `google.cloud.bigquery` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_BIGQUERY`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ BigQuery with Application Default Credentials or a key file.
 ## Create a project
 
 ```bash
-pip install "odcr[bigquery]"
+pip install odcr-bigquery
 odcr init my_contracts --adapter bigquery
 cd my_contracts
 ```

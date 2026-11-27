@@ -6,7 +6,7 @@ Athena over the Glue Data Catalog; Iceberg meta tables in S3.
 | --- | --- |
 | Adapter name | `athena` (aliases: none) |
 | Runs on | AWS |
-| Install | `pip install "odcr[athena]"` |
+| Install | `pip install odcr-athena` |
 | Python driver | `pyathena` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_ATHENA`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ Athena over the Glue Data Catalog; Iceberg meta tables in S3.
 ## Create a project
 
 ```bash
-pip install "odcr[athena]"
+pip install odcr-athena
 odcr init my_contracts --adapter athena
 cd my_contracts
 ```

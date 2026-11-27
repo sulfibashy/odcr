@@ -21,7 +21,7 @@ class Db2Adapter(Adapter):
         try:
             import ibm_db_dbi
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Db2 support needs: pip install 'odcr[db2]'") from exc
+            raise ImportError("Db2 support needs: pip install odcr-db2") from exc
         o = self.options
         dsn = o.get("dsn") or (
             f"DATABASE={o.get('database')};HOSTNAME={o.get('host', 'localhost')};PORT={int(o.get('port', 50000))};"

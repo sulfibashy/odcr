@@ -6,7 +6,7 @@ Collections as objects; JSON batch filters; custom rules with engine: mongodb.
 | --- | --- |
 | Adapter name | `mongodb` (aliases: `documentdb`, `cosmos-mongo`, `atlas`) |
 | Runs on | on-premise, MongoDB Atlas, Amazon DocumentDB, Azure Cosmos DB for MongoDB |
-| Install | `pip install "odcr[mongodb]"` |
+| Install | `pip install odcr-mongodb` |
 | Python driver | `pymongo` |
 | Batch filter example | `{"load_id": "{batch_id}"}` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ Collections as objects; JSON batch filters; custom rules with engine: mongodb.
 ## Create a project
 
 ```bash
-pip install "odcr[mongodb]"
+pip install odcr-mongodb
 odcr init my_contracts --adapter mongodb
 cd my_contracts
 ```

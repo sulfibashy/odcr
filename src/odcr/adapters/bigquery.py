@@ -19,7 +19,7 @@ class BigQueryAdapter(Adapter):
             from google.cloud import bigquery
             from google.cloud.bigquery import dbapi
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("BigQuery support needs: pip install 'odcr[bigquery]'") from exc
+            raise ImportError("BigQuery support needs: pip install odcr-bigquery") from exc
         o = self.options
         if o.get("credentials_path"):
             client = bigquery.Client.from_service_account_json(o["credentials_path"], project=o.get("project"),

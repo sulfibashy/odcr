@@ -3,7 +3,7 @@
 ## 1. Create a project
 
 ```bash
-pip install "odcr[duckdb]"
+pip install odcr-duckdb
 odcr init my_contracts
 ```
 

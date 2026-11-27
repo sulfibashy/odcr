@@ -18,7 +18,7 @@ class MySQLAdapter(Adapter):
         try:
             import pymysql
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("MySQL support needs: pip install 'odcr[mysql]'") from exc
+            raise ImportError("MySQL support needs: pip install odcr-mysql") from exc
         o = self.options
         ssl = {"ssl": {"ca": o["ssl_ca"]}} if o.get("ssl_ca") else {}
         return pymysql.connect(

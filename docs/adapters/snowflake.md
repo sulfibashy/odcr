@@ -6,7 +6,7 @@ Snowflake data cloud (password, key-pair, OAuth, SSO).
 | --- | --- |
 | Adapter name | `snowflake` (aliases: none) |
 | Runs on | AWS, Azure, GCP |
-| Install | `pip install "odcr[snowflake]"` |
+| Install | `pip install odcr-snowflake` |
 | Python driver | `snowflake.connector` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_SNOWFLAKE`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ Snowflake data cloud (password, key-pair, OAuth, SSO).
 ## Create a project
 
 ```bash
-pip install "odcr[snowflake]"
+pip install odcr-snowflake
 odcr init my_contracts --adapter snowflake
 cd my_contracts
 ```

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "odcr-files"
+version = "0.2.2"
+description = "odcr connector for Files: ADLS, S3, GCS, local: installs odcr with the files driver."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "sulfibashy" }, { name = "odcr contributors" }]
+keywords = ["data contracts", "ODCS", "data quality", "odcr", "files"]
+classifiers = ["Programming Language :: Python :: 3", "Operating System :: OS Independent", "Topic :: Database"]
+dependencies = ["odcr[files]==0.2.2"]
+
+[project.urls]
+Homepage = "https://github.com/sulfibashy/odcr"
+Documentation = "https://sulfibashy.github.io/odcr/"
+
+[tool.setuptools]
+packages = []

@@ -22,7 +22,7 @@ class OracleAdapter(Adapter):
         try:
             import oracledb
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Oracle support needs: pip install 'odcr[oracle]'") from exc
+            raise ImportError("Oracle support needs: pip install odcr-oracle") from exc
         o = self.options
         dsn = o.get("dsn") or f"{o.get('host', 'localhost')}:{int(o.get('port', 1521))}/{o.get('service_name', 'FREEPDB1')}"
         conn = oracledb.connect(user=o.get("user") or o.get("username"), password=o.get("password"), dsn=dsn,

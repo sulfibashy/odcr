@@ -6,7 +6,7 @@ Dedicated SQL pools; meta tables are created as HEAP tables.
 | --- | --- |
 | Adapter name | `synapse` (aliases: none) |
 | Runs on | Azure |
-| Install | `pip install "odcr[sqlserver]"` |
+| Install | `pip install odcr-synapse` |
 | Python driver | `pyodbc` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_SYNAPSE`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ Dedicated SQL pools; meta tables are created as HEAP tables.
 ## Create a project
 
 ```bash
-pip install "odcr[sqlserver]"
+pip install odcr-synapse
 odcr init my_contracts --adapter synapse
 cd my_contracts
 ```

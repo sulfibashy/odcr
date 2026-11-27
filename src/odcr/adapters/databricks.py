@@ -23,7 +23,7 @@ class DatabricksAdapter(Adapter):
         try:
             from databricks import sql
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Databricks support needs: pip install 'odcr[databricks]'") from exc
+            raise ImportError("Databricks support needs: pip install odcr-databricks") from exc
         o = self.options
         kwargs: dict[str, Any] = {"server_hostname": o["host"].replace("https://", "").rstrip("/"),
                                   "http_path": o["http_path"]}

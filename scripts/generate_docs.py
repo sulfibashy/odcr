@@ -16,7 +16,7 @@ DOCS = Path(__file__).resolve().parent.parent / "docs"
 
 
 def adapter_page(info: AdapterInfo) -> str:
-    install = f'pip install "odcr[{info.extra}]"' if info.extra else "pip install odcr"
+    install = info.install
     conn = yaml.safe_dump({"connections": {"main": info.connection}}, sort_keys=False).rstrip()
     tested = ("End-to-end tests run against a live instance in CI on every push."
               if info.tested == "ci" else
@@ -73,12 +73,13 @@ odcr run --contract-id orders -C main --batch-id batch-001 --where {example_wher
 def adapters_index() -> str:
     rows = "\n".join(
         f"| [{i.title}]({i.name}.md) | `{i.name}` | {i.clouds} | "
-        f"`{'odcr[' + i.extra + ']' if i.extra else 'odcr'}` | {'CI' if i.tested == 'ci' else 'with credentials'} |"
+        f"`{i.install}` | {'CI' if i.tested == 'ci' else 'with credentials'} |"
         for i in ADAPTERS.values())
     return f"""# Adapters
 
-One adapter per platform. Install only the extras you need: `pip install "odcr[snowflake,databricks]"`,
-or everything with `pip install "odcr[all]"`. `odcr adapters` shows which drivers are installed.
+One adapter per platform, each published as its own package: `pip install odcr-snowflake odcr-databricks`,
+or everything with `pip install odcr-all`. (`pip install "odcr[snowflake]"` works too.) `odcr adapters` shows
+which drivers are installed.
 
 | Platform | Adapter | Where | Install | End-to-end tests |
 | --- | --- | --- | --- | --- |

@@ -20,8 +20,16 @@ jobs:
         with: {python-version: "3.12"}
       - run: pip install -e ".[dev]" && pytest -q
       - run: python -m build && twine check --strict dist/*
+      - name: Build the connector packages (odcr-postgres, odcr-snowflake, ...)
+        run: |
+          python scripts/build_connectors.py
+          git diff --exit-code connectors || (echo "connectors/ is stale: run python scripts/build_connectors.py" && exit 1)
+          for d in connectors/*/; do python -m build --outdir dist-connectors "$d"; done
+          twine check --strict dist-connectors/*
       - uses: actions/upload-artifact@v7
         with: {name: dist, path: dist/}
+      - uses: actions/upload-artifact@v7
+        with: {name: dist-connectors, path: dist-connectors/}
 
   publish:
     needs: build
@@ -33,6 +41,20 @@ jobs:
       - uses: actions/download-artifact@v8
         with: {name: dist, path: dist/}
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-connectors:
+    # One PyPI project per connector; each needs a trusted publisher (same repository / workflow / environment).
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: {name: pypi, url: "https://pypi.org/user/sulfibashy/"}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with: {name: dist-connectors, path: dist/}
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
   github-release:
     needs: publish

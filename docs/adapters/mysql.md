@@ -6,7 +6,7 @@ MySQL, MariaDB and MySQL-compatible databases.
 | --- | --- |
 | Adapter name | `mysql` (aliases: `mariadb`, `aurora-mysql`, `azure-mysql`, `cloudsql-mysql`, `tidb`) |
 | Runs on | on-premise, AWS RDS/Aurora, Azure, GCP Cloud SQL |
-| Install | `pip install "odcr[mysql]"` |
+| Install | `pip install odcr-mysql` |
 | Python driver | `pymysql` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ MySQL, MariaDB and MySQL-compatible databases.
 ## Create a project
 
 ```bash
-pip install "odcr[mysql]"
+pip install odcr-mysql
 odcr init my_contracts --adapter mysql
 cd my_contracts
 ```

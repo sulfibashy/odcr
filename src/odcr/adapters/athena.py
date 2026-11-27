@@ -21,7 +21,7 @@ class AthenaAdapter(Adapter):
         try:
             from pyathena import connect
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("Athena support needs: pip install 'odcr[athena]'") from exc
+            raise ImportError("Athena support needs: pip install odcr-athena") from exc
         o = self.options
         kwargs = {k: o[k] for k in ("s3_staging_dir", "region_name", "work_group", "catalog_name", "profile_name")
                   if o.get(k)}

@@ -6,7 +6,7 @@ Microsoft SQL Server and Azure SQL. Clients: pyodbc (ODBC Driver 18, Entra ID) o
 | --- | --- |
 | Adapter name | `sqlserver` (aliases: `mssql`, `azuresql`, `azure-sql`, `sql-managed-instance`) |
 | Runs on | on-premise, Azure SQL Database, Azure SQL Managed Instance, AWS RDS |
-| Install | `pip install "odcr[sqlserver]"` |
+| Install | `pip install odcr-sqlserver` |
 | Python driver | `pyodbc` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ Microsoft SQL Server and Azure SQL. Clients: pyodbc (ODBC Driver 18, Entra ID) o
 ## Create a project
 
 ```bash
-pip install "odcr[sqlserver]"
+pip install odcr-sqlserver
 odcr init my_contracts --adapter sqlserver
 cd my_contracts
 ```

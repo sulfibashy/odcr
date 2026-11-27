@@ -6,7 +6,7 @@ Oracle Database 19c+ (thin mode, no Oracle Client needed).
 | --- | --- |
 | Adapter name | `oracle` (aliases: none) |
 | Runs on | on-premise, Oracle Cloud (Autonomous), AWS RDS |
-| Install | `pip install "odcr[oracle]"` |
+| Install | `pip install odcr-oracle` |
 | Python driver | `oracledb` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ Oracle Database 19c+ (thin mode, no Oracle Client needed).
 ## Create a project
 
 ```bash
-pip install "odcr[oracle]"
+pip install odcr-oracle
 odcr init my_contracts --adapter oracle
 cd my_contracts
 ```

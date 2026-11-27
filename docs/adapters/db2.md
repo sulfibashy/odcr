@@ -6,7 +6,7 @@ IBM Db2 LUW, Db2 on Cloud and Db2 Warehouse.
 | --- | --- |
 | Adapter name | `db2` (aliases: none) |
 | Runs on | on-premise, IBM Cloud |
-| Install | `pip install "odcr[db2]"` |
+| Install | `pip install odcr-db2` |
 | Python driver | `ibm_db` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_DB2`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ IBM Db2 LUW, Db2 on Cloud and Db2 Warehouse.
 ## Create a project
 
 ```bash
-pip install "odcr[db2]"
+pip install odcr-db2
 odcr init my_contracts --adapter db2
 cd my_contracts
 ```

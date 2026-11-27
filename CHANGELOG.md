@@ -5,6 +5,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-27
+
+### Added
+- One package per connector, like dbt adapters: `pip install odcr-postgres`, `odcr-snowflake`, `odcr-databricks`,
+  `odcr-sqlserver`, `odcr-synapse`, `odcr-fabric`, `odcr-files`, `odcr-mongodb`, ... and `odcr-all`. No brackets or
+  quotes needed (zsh on macOS treats `odcr[postgres]` as a pattern). `pip install "odcr[postgres]"` still works.
+- `odcr adapters`, `odcr init` and every error message now show the `odcr-<platform>` package to install.
+
+### Changed
+- Synapse and Fabric have their own `synapse` and `fabric` extras.
+
 ## [0.2.1] - 2026-11-27
 
 ### Added

@@ -74,7 +74,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"  create {f.relative_to(target.parent)}")
     info = resolve(next(line.split(":", 1)[1].strip() for line in (target / "odcr.yaml").read_text().splitlines()
                         if line.strip().startswith("type:")))
-    extra = f'"odcr[{info.extra}]"' if info.extra else "odcr"
+    extra = info.package
     config_text = (target / "odcr.yaml").read_text()
     keychain = "".join(f"  odcr secret set {n}\n" for n in sorted(set(re.findall(r"\$\{keyring:([^}]+)\}",
                                                                                    config_text))))
@@ -158,7 +158,7 @@ def cmd_adapters(args: argparse.Namespace) -> int:
     rows = []
     for info in ADAPTERS.values():
         rows.append({"adapter": info.name, "platform": info.title, "category": info.category, "where": info.clouds,
-                     "install": f'pip install "odcr[{info.extra}]"' if info.extra else "pip install odcr",
+                     "install": info.install,
                      "driver_installed": driver_installed(info),
                      "tested": "CI end-to-end" if info.tested == "ci" else "end-to-end with credentials",
                      "aliases": list(info.aliases)})

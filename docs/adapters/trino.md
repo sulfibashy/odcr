@@ -6,7 +6,7 @@ Query engine over Hive, Iceberg, Delta Lake, Kafka and more.
 | --- | --- |
 | Adapter name | `trino` (aliases: `starburst`, `presto`) |
 | Runs on | on-premise, Starburst Galaxy, AWS EMR |
-| Install | `pip install "odcr[trino]"` |
+| Install | `pip install odcr-trino` |
 | Python driver | `trino` |
 | Batch filter example | `load_id = '{batch_id}'` |
 | Testing | End-to-end tests run against a live instance in CI on every push. |
@@ -14,7 +14,7 @@ Query engine over Hive, Iceberg, Delta Lake, Kafka and more.
 ## Create a project
 
 ```bash
-pip install "odcr[trino]"
+pip install odcr-trino
 odcr init my_contracts --adapter trino
 cd my_contracts
 ```

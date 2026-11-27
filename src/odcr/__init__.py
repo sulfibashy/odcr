@@ -5,7 +5,7 @@ and trace every batch from ingestion to consumption. Results and history
 are stored in meta tables inside the platform the data lives in.
 """
 
-__version__ = "0.2.2.dev0"
+__version__ = "0.2.2"
 
 from .contract import Contract, load_contract  # noqa: E402
 from .observe import checkpoint, trace  # noqa: E402

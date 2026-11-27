@@ -161,6 +161,15 @@ jobs:
       - run: pip install build twine
       - run: python -m build
       - run: twine check --strict dist/*
+      - name: Build and install a connector package (odcr-duckdb) from the local builds
+        shell: bash
+        run: |
+          python scripts/build_connectors.py
+          python -m build --outdir dist-connectors connectors/odcr-duckdb
+          python -m venv "$RUNNER_TEMP/cvenv"
+          if [ -d "$RUNNER_TEMP/cvenv/bin" ]; then CBIN="$RUNNER_TEMP/cvenv/bin"; else CBIN="$RUNNER_TEMP/cvenv/Scripts"; fi
+          "$CBIN/pip" install --pre --find-links dist --find-links dist-connectors odcr-duckdb
+          "$CBIN/odcr" adapters | grep -E "^duckdb +yes"
       - name: Install the wheel in a clean environment and run the quickstart
         shell: bash
         run: |

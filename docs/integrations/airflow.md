@@ -1,7 +1,7 @@
 # Apache Airflow
 
 ```bash
-pip install "odcr[snowflake]"          # in the Airflow image / environment
+pip install odcr-snowflake          # in the Airflow image / environment
 ```
 
 ```python

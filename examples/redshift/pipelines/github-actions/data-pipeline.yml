@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v7          # this repository: odcr.yaml
       - uses: actions/setup-python@v7
         with: {python-version: "3.12"}
-      - run: pip install "odcr[redshift]"
+      - run: pip install odcr-redshift
       - run: |
           odcr run --contract-id orders --batch-id "${{ inputs.load_id }}" \
             --where "load_id = '${{ inputs.load_id }}'" --pipeline orders --stage ingestion

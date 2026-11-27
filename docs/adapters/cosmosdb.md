@@ -6,7 +6,7 @@ Containers as objects; Cosmos SQL conditions; key or Entra ID auth.
 | --- | --- |
 | Adapter name | `cosmosdb` (aliases: `cosmos`) |
 | Runs on | Azure |
-| Install | `pip install "odcr[cosmosdb]"` |
+| Install | `pip install odcr-cosmosdb` |
 | Python driver | `azure.cosmos` |
 | Batch filter example | `c.load_id = '{batch_id}'` |
 | Testing | End-to-end tests run when credentials are provided (`ODCR_TEST_COSMOSDB`, see [Development](../contributing/development.md)). Unit tests cover the SQL it generates. |
@@ -14,7 +14,7 @@ Containers as objects; Cosmos SQL conditions; key or Entra ID auth.
 ## Create a project
 
 ```bash
-pip install "odcr[cosmosdb]"
+pip install odcr-cosmosdb
 odcr init my_contracts --adapter cosmosdb
 cd my_contracts
 ```

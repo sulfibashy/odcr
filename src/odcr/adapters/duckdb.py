@@ -21,7 +21,7 @@ class DuckDBAdapter(Adapter):
         try:
             import duckdb
         except ImportError as exc:  # pragma: no cover
-            raise ImportError("DuckDB support needs: pip install 'odcr[duckdb]'") from exc
+            raise ImportError("DuckDB support needs: pip install odcr-duckdb") from exc
         return duckdb.connect(str(self.options.get("path") or self.options.get("database") or ":memory:"),
                               read_only=bool(self.options.get("read_only", False)))
 

@@ -28,6 +28,15 @@ class AdapterInfo:
     notes: list[str] = field(default_factory=list)
     where_example: str = "load_id = '{batch_id}'"
 
+    @property
+    def package(self) -> str:
+        """The PyPI package to install: odcr-<extra> (same as odcr[<extra>]), or odcr itself."""
+        return f"odcr-{self.extra}" if self.extra else "odcr"
+
+    @property
+    def install(self) -> str:
+        return f"pip install {self.package}"
+
 
 ADAPTERS: dict[str, AdapterInfo] = {a.name: a for a in [
     AdapterInfo("duckdb", "DuckDB", "duckdb:DuckDBAdapter", "embedded", "local, MotherDuck", "duckdb", "duckdb",
@@ -73,12 +82,12 @@ ADAPTERS: dict[str, AdapterInfo] = {a.name: a for a in [
                        "leave user/password empty.", "No ODBC driver available? Set client: pytds.",
                        "TLS is on and the server certificate is verified (encrypt: yes). For a private CA, install "
                        "it in the OS trust store; trust_server_certificate: true is for local development only."]),
-    AdapterInfo("synapse", "Azure Synapse Analytics", "sqlserver:SynapseAdapter", "cloud", "Azure", "sqlserver",
+    AdapterInfo("synapse", "Azure Synapse Analytics", "sqlserver:SynapseAdapter", "cloud", "Azure", "synapse",
                 "pyodbc", "credentials", "Dedicated SQL pools; meta tables are created as HEAP tables.",
                 {"type": "synapse", "host": "${SYNAPSE_HOST}", "port": 1433, "database": "${SYNAPSE_DATABASE}",
                  "authentication": "ActiveDirectoryInteractive", "user": "${SYNAPSE_USER:-}"}),
     AdapterInfo("fabric", "Microsoft Fabric Warehouse", "sqlserver:FabricWarehouseAdapter", "cloud", "Azure",
-                "sqlserver", "pyodbc", "credentials", "Fabric Warehouse and SQL analytics endpoints.",
+                "fabric", "pyodbc", "credentials", "Fabric Warehouse and SQL analytics endpoints.",
                 {"type": "fabric", "host": "${FABRIC_SQL_ENDPOINT}", "port": 1433, "database": "${FABRIC_WAREHOUSE}",
                  "authentication": "ActiveDirectoryInteractive", "user": "${FABRIC_USER:-}"}),
     AdapterInfo("oracle", "Oracle Database", "oracle:OracleAdapter", "on-premise",
