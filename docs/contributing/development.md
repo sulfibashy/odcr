@@ -33,6 +33,9 @@ python scripts/generate_docs.py
 
 ## Releasing
 
-1. Update `CHANGELOG.md` and the version in `pyproject.toml` and `src/odcr/__init__.py`.
+1. Move the `Unreleased` changelog entries under the new version, and set that version in `pyproject.toml` and
+   `src/odcr/__init__.py` (between releases `main` carries a `.devN` version, e.g. `0.2.2.dev0`, so installs from
+   Git never look like a release).
 2. Run **Actions → release → Run workflow** (or push a tag `vX.Y.Z`). It tests, builds, publishes to PyPI
    (trusted publishing) and creates the GitHub release and tag from the changelog. Run **docs** to update the site.
+3. Bump `main` to the next `.dev0` version.

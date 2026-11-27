@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "odcr"
-version = "0.2.1"
+version = "0.2.2.dev0"
 description = "Open Data Contract Runtime: enforce ODCS data contracts where data lands, reconcile source and target, and trace every batch end to end, on any database, lake or cloud."
 readme = "README.md"
 requires-python = ">=3.10"
