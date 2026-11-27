@@ -94,8 +94,11 @@ Missing a platform? [Adding an adapter](../contributing/adding-an-adapter.md) ta
 def cli_reference() -> str:
     os.environ["COLUMNS"] = "100"
     parser = build_parser()
-    out = ["# CLI reference", "", "Generated from `odcr --help`.", ""]
     sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    out = ["# Commands", "", "| Command | What it does |", "| --- | --- |"]
+    out += [f"| [`odcr {a.dest}`](#odcr-{a.dest}) | {a.help} |" for a in sub._choices_actions]
+    out += ["", "Exit codes: `0` pass or warn, `1` the data broke the contract (or a failure), `2` usage or "
+            "configuration error. Every command accepts `--help`.", ""]
     for action in sub._choices_actions:  # one entry per command (aliases excluded)
         name = action.dest.split(" ")[0]
         sp = sub.choices[name]

@@ -34,10 +34,17 @@ Never put secrets in `odcr.yaml` or contracts. Use:
 
 - environment variables: `${SNOWFLAKE_PASSWORD}` (from your scheduler, Key Vault / Secrets Manager integration,
   or a `.env` file that is git-ignored);
+- the **OS keychain** (macOS Keychain, Windows Credential Manager, Linux Secret Service):
+  `odcr secret set SNOWFLAKE_PASSWORD`, then `password: ${keyring:SNOWFLAKE_PASSWORD}`;
 - secret files: `${file:/run/secrets/snowflake_password}` (Docker / Kubernetes secrets, mounted Key Vault);
 - passwordless identity where the platform supports it: Entra ID managed identity (Azure SQL, Synapse, Fabric,
   Cosmos DB, ADLS), AWS IAM roles (S3, Athena, Redshift IAM), GCP service accounts / Workload Identity
   (BigQuery, GCS), Snowflake key-pair, Databricks OAuth.
+
+Email needs no password with `smtp-relay`, `microsoft365` (Entra ID) or `aws-ses` (IAM role); see
+[Notifications](concepts/notifications.md#email-without-passwords). Contract repositories are read with SSH keys,
+the machine's Git credentials, or the pipeline's own token (`$(System.AccessToken)`, `GITHUB_TOKEN`); tokens are
+passed in memory and redacted from errors.
 
 Webhook URLs and integration keys are masked in logs and in the `notifications` table.
 

@@ -18,7 +18,7 @@ from .contract import Contract, ContractError, load_contract
 from .lint import lint
 from .observe import checkpoint, trace
 from .reconcile import load_reconciliation, run_reconciliation
-from .repository import ContractRepository
+from .repository import ContractRepository, is_git_source
 from .runner import run_contract
 
 EXIT_OK, EXIT_FAIL, EXIT_USAGE = 0, 1, 2
@@ -36,10 +36,15 @@ def _adapters(config: Config, name: str, stack: ExitStack) -> tuple[Adapter, Ada
     return data, data
 
 
+def _repo(args: argparse.Namespace, config: Config) -> ContractRepository:
+    return ContractRepository.from_config(config, getattr(args, "contracts", None),
+                                          getattr(args, "contracts_ref", None))
+
+
 def _contract(args: argparse.Namespace, config: Config) -> Contract:
     if getattr(args, "contract", None):
         return load_contract(args.contract)
-    repo = ContractRepository.from_config(config)
+    repo = _repo(args, config)
     if getattr(args, "contract_id", None):
         return repo.get(args.contract_id)
     if getattr(args, "for_object", None):
@@ -198,7 +203,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     finally:
         adapter.close()
     try:
-        repo = ContractRepository.from_config(config)
+        repo = _repo(args, config)
         print(f"  contracts:   {len(repo.contracts)} valid, {len(repo.errors)} invalid in {repo.root}")
         ok = ok and not repo.errors
     except (ConfigError, ContractError) as exc:
@@ -217,9 +222,11 @@ def cmd_seed(args: argparse.Namespace) -> int:
 
 def cmd_lint(args: argparse.Namespace) -> int:
     paths = list(args.paths)
+    if paths and len(paths) == 1 and is_git_source(paths[0]):
+        args.contracts, paths = paths[0], []
     if not paths:
         config = load_config(args.config)
-        paths = [str(ContractRepository.from_config(config).root)]
+        paths = [str(_repo(args, config).root)]
     code = EXIT_OK
     for p in paths:
         if Path(p).is_dir():
@@ -251,7 +258,7 @@ def _lint_one(path: str, dc_cli: bool) -> int:
 
 def cmd_contracts(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    repo = ContractRepository.from_config(config)
+    repo = _repo(args, config)
     rows = [{"id": c.id, "version": c.version, "domain": c.domain, "owner": c.owner,
              "objects": [o.physical_name for o in c.schema], "file": c.path} for c in repo.contracts.values()]
     if args.json:
@@ -392,10 +399,16 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--connection", "-C", default="main", help="connection name from the config (default: main)")
         sp.add_argument("--json", action="store_true", help="machine-readable output")
 
+    def repo_args(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--contracts", help="contract repository: a folder or a Git URL (GitHub, Azure DevOps, "
+                                            "GitLab, ...); default: odcr.yaml or $ODCR_CONTRACTS")
+        sp.add_argument("--contracts-ref", help="branch or tag of a Git contract repository (default: main)")
+
     def contract_args(sp: argparse.ArgumentParser) -> None:
         sp.add_argument("contract", nargs="?", help="contract file (or use --contract-id / --for-object)")
         sp.add_argument("--contract-id", help="contract id in the contract repository")
         sp.add_argument("--for-object", help="find the contract describing this table / collection / path")
+        repo_args(sp)
 
     sp = sub.add_parser("init", help="create a new odcr project (like dbt init)")
     sp.add_argument("directory", nargs="?", help="folder to create (default: a new folder named after the project)")
@@ -430,6 +443,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("doctor", help="check a connection, its driver, the meta tables and the contracts")
     common(sp)
+    repo_args(sp)
     sp.set_defaults(func=cmd_doctor)
 
     sp = sub.add_parser("seed", help="load the sample orders data into a connection")
@@ -440,11 +454,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("lint", help="validate contract files or folders (default: the contract repository)")
     sp.add_argument("paths", nargs="*")
     sp.add_argument("--config", "-c")
+    repo_args(sp)
     sp.add_argument("--datacontract-cli", action="store_true", help="also run `datacontract lint` if installed")
     sp.set_defaults(func=cmd_lint)
 
     sp = sub.add_parser("contracts", help="list the contracts in the contract repository")
     common(sp, connection=False)
+    repo_args(sp)
     sp.set_defaults(func=cmd_contracts)
 
     sp = sub.add_parser("meta-init", help="create the meta schema and tables")

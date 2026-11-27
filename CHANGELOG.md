@@ -9,6 +9,16 @@ All notable changes to this project are documented here. The format follows
 - `odcr destroy [folder]`: deletes a project created by `odcr init`. It shows what will be deleted (including
   files you added, such as `.env`), asks you to type the project name, never touches database tables, and refuses
   folders that are not odcr projects or that you are currently inside. `--yes` skips the question for scripts.
+- Email without stored passwords: `mail.provider` = `smtp-relay`, `microsoft365` (Microsoft Graph with Entra ID
+  managed identity / workload identity / `az login`), `aws-ses` (IAM role), or `smtp` / `gmail` with the password
+  in the OS keychain. `odcr init` asks how email is sent (`--mail`, `--mail-from`, `--alerts-email`).
+- `odcr secret set|check|delete NAME` and `${keyring:NAME}` in configs: secrets in the macOS Keychain, Windows
+  Credential Manager or Linux Secret Service.
+- Contracts from any Git repository per command: `--contracts <folder or Git URL>`, `--contracts-ref`, or
+  `ODCR_CONTRACTS` / `ODCR_CONTRACTS_REF`; `odcr lint <git url>` works without a project; `token_user` for GitLab.
+- `odcr init` adds pipeline templates (ingestion → contract gate → transformation) for Azure DevOps and GitHub
+  Actions in `pipelines/`.
+- Documentation: architecture and flow diagrams, running in pipelines, command overview.
 - `odcr doctor` shows the connection settings it uses (host, database, user; never the password).
 - `odcr init` writes `.odcr/project.json`, which marks the folder as an odcr project.
 

@@ -351,6 +351,121 @@ steps:
   - script: pytest -q
 """
 
+def azdo_pipeline(info: AdapterInfo) -> str:
+    extra = f"odcr[{info.extra}]" if info.extra else "odcr"
+    where = info.where_example.replace("{batch_id}", "$(LOAD_ID)").replace('"', '\\"')
+    return f"""# Azure DevOps: ingestion -> contract gate -> transformation -> output gate.
+# Copy into your pipeline repository and adapt. Secrets come from a variable group (Key Vault-linked).
+trigger: none
+parameters:
+  - name: loadId
+    type: string
+    default: "$(Build.BuildNumber)"
+
+variables:
+  - group: odcr-secrets                    # Key Vault-linked: connection passwords / tokens, if any
+  - name: LOAD_ID
+    value: ${{{{ parameters.loadId }}}}
+  # Contracts live in another Azure Repos / GitHub repository: fetched with the pipeline's own token
+  - name: ODCR_CONTRACTS
+    value: https://dev.azure.com/acme/data-platform/_git/data-contracts
+  - name: ODCR_CONTRACTS_REF
+    value: main
+
+pool:
+  vmImage: ubuntu-latest                   # or a self-hosted agent inside your network
+
+stages:
+  - stage: ingest
+    jobs:
+      - job: load
+        steps:
+          - script: |
+              echo "Your ingestion: ADF trigger, Databricks job, CDC, copy, ... tagging rows with $(LOAD_ID)"
+
+  - stage: contract_gate                   # runs after ingestion, blocks transformation on a broken contract
+    dependsOn: ingest
+    jobs:
+      - job: odcr
+        steps:
+          - task: UsePythonVersion@0
+            inputs: {{versionSpec: "3.12"}}
+          - script: pip install "{extra}"
+          - script: |
+              odcr run --contract-id orders --batch-id "$(LOAD_ID)" \\
+                --where "{where}" --pipeline orders --stage ingestion
+            displayName: Check the landed batch against its contract
+            env:
+              GIT_TOKEN: $(System.AccessToken)   # reads the contract repository; never stored
+              # connection secrets from the variable group, e.g. PGPASSWORD: $(PGPASSWORD)
+
+  - stage: transform
+    dependsOn: contract_gate               # only runs when the gate passed (exit code 0)
+    jobs:
+      - job: dbt
+        steps:
+          - script: |
+              echo "dbt build / Databricks job / stored procedures"
+
+  - stage: output_gate                     # optional: contracts on what you publish (gold / data products)
+    dependsOn: transform
+    jobs:
+      - job: odcr
+        steps:
+          - script: pip install "{extra}"
+          - script: |
+              odcr run --contract-id orders_gold --batch-id "$(LOAD_ID)" --pipeline orders --stage gold
+            env:
+              GIT_TOKEN: $(System.AccessToken)
+"""
+
+
+def github_pipeline(info: AdapterInfo) -> str:
+    extra = f"odcr[{info.extra}]" if info.extra else "odcr"
+    where = info.where_example.replace("{batch_id}", "${{ inputs.load_id }}").replace('"', '\\"')
+    return f"""# GitHub Actions: ingestion -> contract gate -> transformation.
+# Copy to .github/workflows/ in your pipeline repository and adapt.
+name: orders-pipeline
+on:
+  workflow_dispatch:
+    inputs:
+      load_id: {{description: "Batch / load id", required: true}}
+
+env:
+  ODCR_CONTRACTS: https://github.com/acme/data-contracts.git   # contracts in another repository
+  ODCR_CONTRACTS_REF: main
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Your ingestion, tagging rows with ${{{{ inputs.load_id }}}}"
+
+  contract_gate:
+    needs: ingest
+    runs-on: ubuntu-latest                 # or self-hosted inside your network
+    steps:
+      - uses: actions/checkout@v7          # this repository: odcr.yaml
+      - uses: actions/setup-python@v7
+        with: {{python-version: "3.12"}}
+      - run: pip install "{extra}"
+      - run: |
+          odcr run --contract-id orders --batch-id "${{{{ inputs.load_id }}}}" \\
+            --where "{where}" --pipeline orders --stage ingestion
+        env:
+          GIT_TOKEN: ${{{{ secrets.CONTRACTS_REPO_TOKEN }}}}   # read access to the contract repository
+          # connection secrets, e.g. PGPASSWORD: ${{{{ secrets.PGPASSWORD }}}}
+
+  transform:
+    needs: contract_gate                   # skipped when the contract is broken
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "dbt build / Databricks job"
+"""
+
+
 GITIGNORE = """.env
 *.duckdb
 *.duckdb.wal
@@ -405,6 +520,7 @@ From a pipeline: `jobs/ingestion_gate.sh` (Linux/macOS/Unix), `jobs/ingestion_ga
 | `jobs/` | Scripts your scheduler or ETL tool calls. |
 | `tests/` | `pytest` validates every contract. |
 | `.github/`, `azure-pipelines.yml` | CI that validates contracts on every pull request. |
+| `pipelines/` | Templates: ingestion → contract gate → transformation, for Azure DevOps and GitHub Actions. |
 """
 
 
@@ -485,6 +601,8 @@ def scaffold(directory: str | Path | None = None, *, name: str | None = None, ad
         "tests/test_contracts.py": TEST_PY,
         ".github/workflows/contracts.yml": GITHUB_CI,
         "azure-pipelines.yml": AZURE_CI,
+        "pipelines/azure-devops/data-pipeline.yml": azdo_pipeline(info),
+        "pipelines/github-actions/data-pipeline.yml": github_pipeline(info),
         "README.md": readme(name, info),
         ".gitignore": GITIGNORE,
     }

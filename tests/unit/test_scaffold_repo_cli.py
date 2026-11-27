@@ -20,7 +20,8 @@ from odcr.scaffold import PROMPT_ORDER, scaffold
 EXPECTED = ["odcr.yaml", ".env.example", "contracts/sales/orders.odcs.yaml", "reconciliations/orders.recon.yaml",
             "seeds/orders.csv", "jobs/ingestion_gate.py", "jobs/ingestion_gate.sh", "jobs/ingestion_gate.ps1",
             "tests/test_contracts.py", ".github/workflows/contracts.yml", "azure-pipelines.yml", "README.md",
-            ".gitignore", ".odcr/project.json"]
+            ".gitignore", ".odcr/project.json", "pipelines/azure-devops/data-pipeline.yml",
+            "pipelines/github-actions/data-pipeline.yml"]
 
 
 @pytest.mark.parametrize("adapter", sorted(ADAPTERS))
@@ -38,6 +39,9 @@ def test_scaffold_every_adapter(adapter, tmp_path):
         assert f"{var}=" in env
     compile((root / "jobs/ingestion_gate.py").read_text(), "ingestion_gate.py", "exec")
     yaml.safe_load((root / "reconciliations/orders.recon.yaml").read_text())
+    for pipeline in ("pipelines/azure-devops/data-pipeline.yml", "pipelines/github-actions/data-pipeline.yml"):
+        doc = yaml.safe_load((root / pipeline).read_text())
+        assert "odcr run --contract-id orders" in (root / pipeline).read_text() and doc
     assert "pip install" in (root / "README.md").read_text()
 
 
@@ -259,3 +263,28 @@ def test_init_mail_providers(provider, expected, secret, tmp_path, capsys):
     assert "SMTP_PASSWORD=" not in (root / ".env.example").read_text()  # never a plain-text password
     assert ("odcr secret set SMTP_PASSWORD" in capsys.readouterr().out) is secret
     yaml.safe_load(text)
+
+
+@pytest.mark.skipif(not shutil.which("git"), reason="git not installed")
+def test_contracts_from_git_on_the_command_line(tmp_path, monkeypatch, capsys):
+    """Contracts in another repository (GitHub, Azure DevOps, ...): --contracts or $ODCR_CONTRACTS."""
+    monkeypatch.setenv("ODCR_CACHE_DIR", str(tmp_path / "cache"))
+    src = tmp_path / "contracts-repo"
+    write_contract(src / "contracts" / "orders.odcs.yaml", "orders", "orders")
+    git = lambda *a: subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *a], cwd=src,  # noqa: E731
+                                    check=True, capture_output=True)
+    git("init", "-q", "-b", "main")
+    git("add", ".")
+    git("commit", "-qm", "c")
+    url = src.as_uri()
+    monkeypatch.chdir(tmp_path)
+    assert main(["lint", url]) == 0                                    # no project needed
+    capsys.readouterr()
+    assert main(["contracts", "--contracts", url, "--json"]) == 0
+    assert [c["id"] for c in json.loads(capsys.readouterr().out)] == ["orders"]
+    monkeypatch.setenv("ODCR_CONTRACTS", url)
+    monkeypatch.setenv("ODCR_CONTRACTS_REF", "main")
+    assert main(["contracts", "--json"]) == 0
+    assert [c["id"] for c in json.loads(capsys.readouterr().out)] == ["orders"]
+    monkeypatch.setenv("ODCR_CONTRACTS", str(tmp_path / "nowhere"))
+    assert main(["contracts"]) == 2

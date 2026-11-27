@@ -9,7 +9,17 @@
       path: contracts                       # folder inside the repository
       token_env: GIT_TOKEN                  # optional: HTTPS token for private repositories
 
-Contracts are found by id (`--contract-id orders`) or by the object they describe (`--object sales.orders`).
+Works with any Git host: GitHub, Azure DevOps (Azure Repos), GitLab, Bitbucket, Gitea, on-premise servers.
+Authentication, in order of preference:
+  * nothing to configure: SSH keys, or Git Credential Manager / `az login` / `gh auth` on the machine;
+  * in pipelines: the pipeline's own token, e.g. Azure DevOps $(System.AccessToken) or GitHub's GITHUB_TOKEN,
+    passed in an environment variable named by `token_env` (never written to disk or logs).
+
+Override the source per command without editing odcr.yaml:
+    odcr run --contracts https://dev.azure.com/acme/data/_git/contracts --contracts-ref main --contract-id orders
+    ODCR_CONTRACTS=git@github.com:acme/data-contracts.git odcr lint
+
+Contracts are found by id (`--contract-id orders`) or by the object they describe (`--for-object sales.orders`).
 """
 
 from __future__ import annotations
@@ -36,28 +46,51 @@ def cache_dir() -> Path:
     return Path(base)
 
 
+def _redact(text: str) -> str:
+    import re
+
+    return re.sub(r"https://[^/@\s]+@", "https://***@", text)
+
+
 def _git(*args: str, cwd: Path | None = None) -> None:
     exe = shutil.which("git")
     if not exe:
         raise ConfigError("git is not installed; install Git or point contracts.path to a local folder")
     proc = subprocess.run([exe, *args], cwd=cwd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        raise ConfigError(f"git {' '.join(a for a in args if 'x-access-token' not in a)} failed: "
-                          f"{proc.stderr.strip()[:500]}")
+        shown = " ".join(a for a in args if "@" not in a or a.startswith("git@"))
+        raise ConfigError(f"git {shown} failed: {_redact(proc.stderr.strip())[:500]}")
 
 
-def sync_git(url: str, ref: str = "main", token_env: str | None = None) -> Path:
+GIT_PREFIXES = ("https://", "http://", "ssh://", "git@", "git://", "file://")
+
+
+def is_git_source(source: str) -> bool:
+    return source.startswith(GIT_PREFIXES) or source.endswith(".git")
+
+
+def contracts_spec(source: str, ref: str | None = None, path: str | None = None) -> dict[str, Any]:
+    """A `contracts:` block from a command-line / environment value: a folder or a Git URL."""
+    if is_git_source(source):
+        spec: dict[str, Any] = {"git": source, "ref": ref or "main", "token_env": "GIT_TOKEN"}
+        if path is not None:
+            spec["path"] = path
+        return spec
+    return {"path": source}
+
+
+def sync_git(url: str, ref: str = "main", token_env: str | None = None, token_user: str = "x-access-token") -> Path:
     """Clone or refresh the contract repository into the local cache and return its folder."""
     target = cache_dir() / "repos" / hashlib.sha1(f"{url}@{ref}".encode()).hexdigest()[:12]
     auth_url = url
     if token_env and os.environ.get(token_env) and url.startswith("https://"):
-        auth_url = url.replace("https://", f"https://x-access-token:{os.environ[token_env]}@", 1)
+        auth_url = url.replace("https://", f"https://{token_user}:{os.environ[token_env]}@", 1)
     if (target / ".git").exists():
-        _git("fetch", "--depth", "1", auth_url, ref, cwd=target)
+        _git("-c", "credential.interactive=never", "fetch", "--depth", "1", auth_url, ref, cwd=target)
         _git("reset", "--hard", "FETCH_HEAD", cwd=target)
     else:
         target.parent.mkdir(parents=True, exist_ok=True)
-        _git("clone", "--depth", "1", "--branch", ref, auth_url, str(target))
+        _git("-c", "credential.interactive=never", "clone", "--depth", "1", "--branch", ref, auth_url, str(target))
     return target
 
 
@@ -98,10 +131,20 @@ class ContractRepository:
         return repo
 
     @classmethod
-    def from_config(cls, config: Config) -> ContractRepository:
-        spec: dict[str, Any] = config.contracts or {}
+    def from_config(cls, config: Config, source: str | None = None, ref: str | None = None) -> ContractRepository:
+        """Load from `source` (command line), else $ODCR_CONTRACTS, else the config's `contracts:` block."""
+        source = source or os.environ.get("ODCR_CONTRACTS")
+        if source:
+            ref = ref or os.environ.get("ODCR_CONTRACTS_REF")
+            path = os.environ.get("ODCR_CONTRACTS_PATH")
+            spec: dict[str, Any] = contracts_spec(source, ref, path)
+        else:
+            spec = dict(config.contracts or {})
+            if ref and spec.get("git"):
+                spec["ref"] = ref
         if spec.get("git"):
-            root = sync_git(str(spec["git"]), str(spec.get("ref", "main")), spec.get("token_env"))
+            root = sync_git(str(spec["git"]), str(spec.get("ref", "main")), spec.get("token_env"),
+                            str(spec.get("token_user", "x-access-token")))
             return cls.load(root / str(spec.get("path", "")))
         path = Path(str(spec.get("path", "contracts")))
         return cls.load(path if path.is_absolute() else config.base_dir / path)

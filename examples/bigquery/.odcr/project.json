@@ -13,6 +13,8 @@
     "jobs/ingestion_gate.py",
     "jobs/ingestion_gate.sh",
     "odcr.yaml",
+    "pipelines/azure-devops/data-pipeline.yml",
+    "pipelines/github-actions/data-pipeline.yml",
     "reconciliations/orders.recon.yaml",
     "seeds/orders.csv",
     "tests/test_contracts.py"

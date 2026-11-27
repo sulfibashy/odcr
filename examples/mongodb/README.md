@@ -34,3 +34,4 @@ From a pipeline: `jobs/ingestion_gate.sh` (Linux/macOS/Unix), `jobs/ingestion_ga
 | `jobs/` | Scripts your scheduler or ETL tool calls. |
 | `tests/` | `pytest` validates every contract. |
 | `.github/`, `azure-pipelines.yml` | CI that validates contracts on every pull request. |
+| `pipelines/` | Templates: ingestion → contract gate → transformation, for Azure DevOps and GitHub Actions. |

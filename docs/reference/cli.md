@@ -1,6 +1,24 @@
-# CLI reference
+# Commands
 
-Generated from `odcr --help`.
+| Command | What it does |
+| --- | --- |
+| [`odcr init`](#odcr-init) | create a new odcr project (like dbt init) |
+| [`odcr destroy`](#odcr-destroy) | delete a project created by odcr init (asks for confirmation) |
+| [`odcr secret`](#odcr-secret) | store a password or token in the OS keychain (no plain-text secrets) |
+| [`odcr adapters`](#odcr-adapters) | list supported platforms and how to install each |
+| [`odcr doctor`](#odcr-doctor) | check a connection, its driver, the meta tables and the contracts |
+| [`odcr seed`](#odcr-seed) | load the sample orders data into a connection |
+| [`odcr lint`](#odcr-lint) | validate contract files or folders (default: the contract repository) |
+| [`odcr contracts`](#odcr-contracts) | list the contracts in the contract repository |
+| [`odcr meta-init`](#odcr-meta-init) | create the meta schema and tables |
+| [`odcr run`](#odcr-run) | check a table, file or batch against its contract |
+| [`odcr watch`](#odcr-watch) | check every new file or batch the moment it lands |
+| [`odcr reconcile`](#odcr-reconcile) | compare source and target for a batch |
+| [`odcr checkpoint`](#odcr-checkpoint) | record that a stage processed a batch |
+| [`odcr trace`](#odcr-trace) | show a batch's journey through every stage |
+| [`odcr history`](#odcr-history) | recent validation runs |
+
+Exit codes: `0` pass or warn, `1` the data broke the contract (or a failure), `2` usage or configuration error. Every command accepts `--help`.
 
 ## odcr init
 
@@ -83,6 +101,7 @@ check a connection, its driver, the meta tables and the contracts
 
 ```text
 usage: odcr doctor [-h] [--config CONFIG] [--connection CONNECTION] [--json]
+                   [--contracts CONTRACTS] [--contracts-ref CONTRACTS_REF]
 
 options:
   -h, --help            show this help message and exit
@@ -90,6 +109,11 @@ options:
   --connection, -C CONNECTION
                         connection name from the config (default: main)
   --json                machine-readable output
+  --contracts CONTRACTS
+                        contract repository: a folder or a Git URL (GitHub, Azure DevOps, GitLab,
+                        ...); default: odcr.yaml or $ODCR_CONTRACTS
+  --contracts-ref CONTRACTS_REF
+                        branch or tag of a Git contract repository (default: main)
 ```
 
 ## odcr seed
@@ -113,15 +137,22 @@ options:
 validate contract files or folders (default: the contract repository)
 
 ```text
-usage: odcr lint [-h] [--config CONFIG] [--datacontract-cli] [paths ...]
+usage: odcr lint [-h] [--config CONFIG] [--contracts CONTRACTS] [--contracts-ref CONTRACTS_REF]
+                 [--datacontract-cli]
+                 [paths ...]
 
 positional arguments:
   paths
 
 options:
-  -h, --help           show this help message and exit
+  -h, --help            show this help message and exit
   --config, -c CONFIG
-  --datacontract-cli   also run `datacontract lint` if installed
+  --contracts CONTRACTS
+                        contract repository: a folder or a Git URL (GitHub, Azure DevOps, GitLab,
+                        ...); default: odcr.yaml or $ODCR_CONTRACTS
+  --contracts-ref CONTRACTS_REF
+                        branch or tag of a Git contract repository (default: main)
+  --datacontract-cli    also run `datacontract lint` if installed
 ```
 
 ## odcr contracts
@@ -129,12 +160,18 @@ options:
 list the contracts in the contract repository
 
 ```text
-usage: odcr contracts [-h] [--config CONFIG] [--json]
+usage: odcr contracts [-h] [--config CONFIG] [--json] [--contracts CONTRACTS]
+                      [--contracts-ref CONTRACTS_REF]
 
 options:
-  -h, --help           show this help message and exit
-  --config, -c CONFIG  config file (default: ./odcr.yaml)
-  --json               machine-readable output
+  -h, --help            show this help message and exit
+  --config, -c CONFIG   config file (default: ./odcr.yaml)
+  --json                machine-readable output
+  --contracts CONTRACTS
+                        contract repository: a folder or a Git URL (GitHub, Azure DevOps, GitLab,
+                        ...); default: odcr.yaml or $ODCR_CONTRACTS
+  --contracts-ref CONTRACTS_REF
+                        branch or tag of a Git contract repository (default: main)
 ```
 
 ## odcr meta-init
@@ -157,10 +194,10 @@ options:
 check a table, file or batch against its contract
 
 ```text
-usage: odcr run [-h] [--contract-id CONTRACT_ID] [--for-object FOR_OBJECT] [--config CONFIG]
-                [--connection CONNECTION] [--json] [--batch-id BATCH_ID] [--where WHERE]
-                [--object OBJECT] [--pipeline PIPELINE] [--stage STAGE] [--fail-on-warn]
-                [--no-notify]
+usage: odcr run [-h] [--contract-id CONTRACT_ID] [--for-object FOR_OBJECT] [--contracts CONTRACTS]
+                [--contracts-ref CONTRACTS_REF] [--config CONFIG] [--connection CONNECTION]
+                [--json] [--batch-id BATCH_ID] [--where WHERE] [--object OBJECT]
+                [--pipeline PIPELINE] [--stage STAGE] [--fail-on-warn] [--no-notify]
                 [contract]
 
 positional arguments:
@@ -172,6 +209,11 @@ options:
                         contract id in the contract repository
   --for-object FOR_OBJECT
                         find the contract describing this table / collection / path
+  --contracts CONTRACTS
+                        contract repository: a folder or a Git URL (GitHub, Azure DevOps, GitLab,
+                        ...); default: odcr.yaml or $ODCR_CONTRACTS
+  --contracts-ref CONTRACTS_REF
+                        branch or tag of a Git contract repository (default: main)
   --config, -c CONFIG   config file (default: ./odcr.yaml)
   --connection, -C CONNECTION
                         connection name from the config (default: main)
@@ -190,7 +232,8 @@ options:
 check every new file or batch the moment it lands
 
 ```text
-usage: odcr watch [-h] [--contract-id CONTRACT_ID] [--for-object FOR_OBJECT] [--config CONFIG]
+usage: odcr watch [-h] [--contract-id CONTRACT_ID] [--for-object FOR_OBJECT]
+                  [--contracts CONTRACTS] [--contracts-ref CONTRACTS_REF] [--config CONFIG]
                   [--connection CONNECTION] [--json] [--batch-column BATCH_COLUMN]
                   [--interval INTERVAL] [--once] [--pipeline PIPELINE] [--no-notify]
                   [contract]
@@ -204,6 +247,11 @@ options:
                         contract id in the contract repository
   --for-object FOR_OBJECT
                         find the contract describing this table / collection / path
+  --contracts CONTRACTS
+                        contract repository: a folder or a Git URL (GitHub, Azure DevOps, GitLab,
+                        ...); default: odcr.yaml or $ODCR_CONTRACTS
+  --contracts-ref CONTRACTS_REF
+                        branch or tag of a Git contract repository (default: main)
   --config, -c CONFIG   config file (default: ./odcr.yaml)
   --connection, -C CONNECTION
                         connection name from the config (default: main)

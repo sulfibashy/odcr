@@ -11,7 +11,7 @@
 [![Docs](https://img.shields.io/badge/docs-sulfibashy.github.io%2Fodcr-indigo.svg)](https://sulfibashy.github.io/odcr/)
 [![ODCS](https://img.shields.io/badge/contracts-ODCS%20v3-green.svg)](https://github.com/bitol-io/open-data-contract-standard)
 
-[Documentation](https://sulfibashy.github.io/odcr/) · [Quickstart](#quickstart) · [Adapters](#adapters) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
+[Documentation](https://sulfibashy.github.io/odcr/) · [Architecture](docs/architecture.md) · [Quickstart](#quickstart) · [Adapters](#adapters) · [Examples](examples/) · [Contributing](CONTRIBUTING.md)
 
 </div>
 

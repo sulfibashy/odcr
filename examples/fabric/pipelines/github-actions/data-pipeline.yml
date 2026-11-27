@@ -1,0 +1,40 @@
+# GitHub Actions: ingestion -> contract gate -> transformation.
+# Copy to .github/workflows/ in your pipeline repository and adapt.
+name: orders-pipeline
+on:
+  workflow_dispatch:
+    inputs:
+      load_id: {description: "Batch / load id", required: true}
+
+env:
+  ODCR_CONTRACTS: https://github.com/acme/data-contracts.git   # contracts in another repository
+  ODCR_CONTRACTS_REF: main
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Your ingestion, tagging rows with ${{ inputs.load_id }}"
+
+  contract_gate:
+    needs: ingest
+    runs-on: ubuntu-latest                 # or self-hosted inside your network
+    steps:
+      - uses: actions/checkout@v7          # this repository: odcr.yaml
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12"}
+      - run: pip install "odcr[sqlserver]"
+      - run: |
+          odcr run --contract-id orders --batch-id "${{ inputs.load_id }}" \
+            --where "load_id = '${{ inputs.load_id }}'" --pipeline orders --stage ingestion
+        env:
+          GIT_TOKEN: ${{ secrets.CONTRACTS_REPO_TOKEN }}   # read access to the contract repository
+          # connection secrets, e.g. PGPASSWORD: ${{ secrets.PGPASSWORD }}
+
+  transform:
+    needs: contract_gate                   # skipped when the contract is broken
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "dbt build / Databricks job"

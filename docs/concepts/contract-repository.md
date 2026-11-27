@@ -30,6 +30,17 @@ contracts:
 
 The cache lives in `~/.cache/odcr` (override with `ODCR_CACHE_DIR`). Git must be installed for the `git:` form.
 
+Any Git host works — GitHub, Azure Repos (`https://dev.azure.com/<org>/<project>/_git/<repo>`), GitLab,
+Bitbucket, on-premise servers — and the source can be overridden per command or per pipeline:
+
+```bash
+odcr run --contracts https://dev.azure.com/acme/data/_git/contracts --contracts-ref release/2026-11 --contract-id orders
+ODCR_CONTRACTS=git@github.com:acme/data-contracts.git odcr contracts
+odcr lint https://github.com/acme/data-contracts.git          # validate a repository without any project
+```
+
+Authentication and pipeline examples: [Running in pipelines](../getting-started/pipelines.md).
+
 ## Finding a contract
 
 ```bash

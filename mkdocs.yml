@@ -21,14 +21,20 @@ markdown_extensions:
   - md_in_html
   - tables
   - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed: {alternate_style: true}
 nav:
   - Home: index.md
+  - Architecture and flow: architecture.md
   - Getting started:
       - Installation: getting-started/installation.md
       - Quickstart: getting-started/quickstart.md
       - Project structure: getting-started/project-structure.md
+      - Running in pipelines: getting-started/pipelines.md
   - Concepts:
       - Contract repository: concepts/contract-repository.md
       - What odcr checks: concepts/contracts.md
@@ -67,7 +73,7 @@ nav:
       - CI/CD: integrations/ci-cd.md
   - Security: security.md
   - Reference:
-      - CLI: reference/cli.md
+      - Commands: reference/cli.md
       - Python API: reference/python-api.md
       - Meta tables: reference/meta-tables.md
   - Contributing:
