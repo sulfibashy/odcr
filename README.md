@@ -111,7 +111,7 @@ schema:
 ## Runs everywhere
 
 - **Operating systems:** Windows, macOS, Linux and Unix servers — tested in CI on all three major ones.
-- **Install:** `pip`, `pipx`, offline wheelhouses for air-gapped servers, the [Dockerfile](Dockerfile), Databricks
+- **Install:** `pip`, `pipx`, offline wheelhouses for air-gapped servers, the container image `ghcr.io/sulfibashy/odcr`, Databricks
   libraries, Azure Functions, AWS Lambda.
 - **Security:** TLS with verified certificates by default; corporate CA bundles and proxies; secrets from
   environment variables, `.env` or secret files; managed identities, IAM roles, key-pair and OAuth. See

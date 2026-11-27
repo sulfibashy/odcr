@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Container image `ghcr.io/sulfibashy/odcr` (linux/amd64 and linux/arm64) with odcr, every driver and the
+  Microsoft ODBC Driver 18, published on every release: `docker run ghcr.io/sulfibashy/odcr odcr run ...`.
+
 ## [0.2.2] - 2026-11-27
 
 ### Added

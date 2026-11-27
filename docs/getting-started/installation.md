@@ -109,9 +109,33 @@ bundle can be configured for notifications and cloud storage.
 
 ## Docker
 
+A ready-made image with odcr and the drivers for every platform (including the Microsoft ODBC Driver 18),
+for `linux/amd64` and `linux/arm64` (Apple silicon, Graviton). No Python needed on the machine:
+
+```bash
+docker pull ghcr.io/sulfibashy/odcr:latest          # or a version: ghcr.io/sulfibashy/odcr:0.2.2
+docker run --rm -v "$PWD:/work" --env-file .env ghcr.io/sulfibashy/odcr odcr run --contract-id orders
+```
+
+The project folder is mounted at `/work`; connection settings come from environment variables
+(`--env-file .env` or `-e NAME`). Use it as the container of a pipeline job, for example in Azure DevOps:
+
+```yaml
+jobs:
+  - job: contract_checks
+    container: ghcr.io/sulfibashy/odcr:0.2.2
+    steps:
+      - script: odcr run --contract-id orders --batch-id $(Build.BuildId)
+```
+
+The same image works in GitHub Actions (`container:`), GitLab CI (`image:`), Airflow's
+`KubernetesPodOperator` / `DockerOperator`, Azure Container Apps jobs and Kubernetes `Job`s.
+IBM Db2 is included on `amd64` only (IBM publishes no ARM64 Linux driver).
+
+To build a smaller image with only the adapters you use:
+
 ```bash
 docker build -t odcr --build-arg EXTRAS=postgres,sqlserver https://github.com/sulfibashy/odcr.git
-docker run --rm -v "$PWD:/work" -w /work --env-file .env odcr run --contract-id orders
 ```
 
 ## Databricks, Azure Functions, AWS Lambda

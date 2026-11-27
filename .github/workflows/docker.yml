@@ -1,0 +1,79 @@
+name: docker
+
+# Container image ghcr.io/sulfibashy/odcr (linux/amd64 + linux/arm64), with odcr and every driver.
+# Called by the release workflow; can also be run by hand for a version already on PyPI.
+on:
+  workflow_call:
+    inputs:
+      version: {description: "odcr version on PyPI", required: true, type: string}
+  workflow_dispatch:
+    inputs:
+      version: {description: "odcr version on PyPI (e.g. 0.2.2)", required: true, type: string}
+  pull_request:
+    paths: [Dockerfile, docker-entrypoint.sh, .github/workflows/docker.yml]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Tags
+        id: tags
+        shell: bash
+        run: |
+          image=ghcr.io/${GITHUB_REPOSITORY,,}
+          version="${{ inputs.version }}"
+          if [ -z "$version" ]; then
+            echo "push=false" >> "$GITHUB_OUTPUT"; echo "tags=$image:test" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          tags="$image:$version"
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tags="$tags,$image:${version%.*},$image:latest"
+          fi
+          echo "push=true" >> "$GITHUB_OUTPUT"; echo "tags=$tags" >> "$GITHUB_OUTPUT"
+      - name: Wait for the version on PyPI
+        if: inputs.version != ''
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf "https://pypi.org/pypi/odcr/${{ inputs.version }}/json" >/dev/null && exit 0
+            sleep 10
+          done
+          echo "odcr ${{ inputs.version }} is not on PyPI" && exit 1
+      - name: Build and smoke-test (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: odcr:smoke
+          build-args: ODCR_VERSION=${{ inputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test
+        run: |
+          docker run --rm odcr:smoke odcr --version
+          docker run --rm odcr:smoke adapters
+          docker run --rm odcr:smoke python -c "import duckdb, psycopg, pyodbc, confluent_kafka, ibm_db"
+          docker run --rm odcr:smoke odcr init demo --adapter duckdb --no-input >/dev/null 2>&1 || true
+      - uses: docker/login-action@v3
+        if: steps.tags.outputs.push == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and push (amd64 + arm64)
+        if: steps.tags.outputs.push == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: ODCR_VERSION=${{ inputs.version }}
+          labels: org.opencontainers.image.version=${{ inputs.version }}
+          cache-from: type=gha
