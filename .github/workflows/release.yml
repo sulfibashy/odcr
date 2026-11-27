@@ -14,6 +14,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      connectors: ${{ steps.connectors.outputs.list }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -26,6 +28,8 @@ jobs:
           git diff --exit-code connectors || (echo "connectors/ is stale: run python scripts/build_connectors.py" && exit 1)
           for d in connectors/*/; do python -m build --outdir dist-connectors "$d"; done
           twine check --strict dist-connectors/*
+      - id: connectors
+        run: echo "list=$(python -c 'import json,os; print(json.dumps(sorted(os.listdir("connectors"))))')" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with: {name: dist, path: dist/}
       - uses: actions/upload-artifact@v7
@@ -43,15 +47,24 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   publish-connectors:
-    # One PyPI project per connector; each needs a trusted publisher (same repository / workflow / environment).
-    needs: publish
+    # PyPI allows one trusted publisher per (repository, workflow, environment), so every connector
+    # publishes from its own GitHub environment, named after the package: odcr-postgres, odcr-snowflake, ...
+    needs: [build, publish]
     runs-on: ubuntu-latest
-    environment: {name: pypi, url: "https://pypi.org/user/sulfibashy/"}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.build.outputs.connectors) }}
+    environment: {name: "${{ matrix.package }}", url: "https://pypi.org/p/${{ matrix.package }}"}
     permissions:
       id-token: write
     steps:
       - uses: actions/download-artifact@v8
-        with: {name: dist-connectors, path: dist/}
+        with: {name: dist-connectors, path: all/}
+      - name: Select ${{ matrix.package }}
+        run: |
+          prefix=$(echo "${{ matrix.package }}" | tr - _)
+          mkdir dist && cp all/${prefix}-[0-9]* dist/ && ls dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
