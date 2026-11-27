@@ -21,13 +21,19 @@ odcr adapters                                   # what is supported and what is 
 | `odcr` | the core, plus SQLite (built into Python) |
 | `odcr-duckdb` | DuckDB, MotherDuck |
 | `odcr-files` | Parquet / CSV / JSON in local folders, network shares, ADLS Gen2, Azure Blob, S3, GCS, MinIO |
-| `odcr-postgres` | PostgreSQL, Aurora / RDS, Azure Database for PostgreSQL, Cloud SQL, AlloyDB |
-| `odcr-mysql` | MySQL, MariaDB, Aurora / RDS, Azure Database for MySQL, Cloud SQL |
+| `odcr-postgres` | PostgreSQL, Aurora / RDS, Azure Database for PostgreSQL, Cloud SQL, AlloyDB, Greenplum, CockroachDB, YugabyteDB, TimescaleDB |
+| `odcr-mysql` | MySQL, MariaDB, Aurora / RDS, Azure Database for MySQL, Cloud SQL, TiDB, SingleStore |
 | `odcr-sqlserver` | SQL Server, Azure SQL Database, Azure SQL Managed Instance |
 | `odcr-synapse` | Azure Synapse Analytics (dedicated SQL pools) |
 | `odcr-fabric` | Microsoft Fabric Warehouse |
 | `odcr-oracle` | Oracle Database, Autonomous Database |
 | `odcr-db2` | IBM Db2 LUW, Db2 on Cloud, Db2 Warehouse |
+| `odcr-teradata` | Teradata Vantage, VantageCloud |
+| `odcr-saphana` | SAP HANA Cloud, SAP HANA on-premise, SAP Datasphere |
+| `odcr-vertica` | Vertica on-premise and Eon mode |
+| `odcr-clickhouse` | ClickHouse, ClickHouse Cloud, Altinity, Aiven |
+| `odcr-hive` | Apache Hive, Spark SQL Thrift server (Cloudera, EMR, Dataproc, HDInsight) |
+| `odcr-impala` | Apache Impala (Cloudera) |
 | `odcr-trino` | Trino, Starburst, Presto |
 | `odcr-snowflake` | Snowflake |
 | `odcr-databricks` | Databricks on Azure, AWS and GCP |
@@ -36,6 +42,8 @@ odcr adapters                                   # what is supported and what is 
 | `odcr-athena` | Amazon Athena |
 | `odcr-mongodb` | MongoDB, Atlas, Amazon DocumentDB, Cosmos DB for MongoDB |
 | `odcr-cosmosdb` | Azure Cosmos DB for NoSQL |
+| `odcr-kafka` | Apache Kafka, Confluent, Amazon MSK, Aiven, Redpanda, IBM Event Streams |
+| `odcr-eventhubs` | Azure Event Hubs (Kafka endpoint, Entra ID) |
 | `odcr-all` | every driver above |
 
 The equivalent "extras" form also works: `pip install "odcr[postgres]"`. In zsh (the macOS default shell) the

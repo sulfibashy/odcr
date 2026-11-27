@@ -5,6 +5,7 @@
 # Environment for pytest (already the defaults, except the ones marked *):
 #   ODCR_PG_HOST=localhost ODCR_MYSQL_HOST=127.0.0.1 ODCR_MARIADB_HOST=127.0.0.1* ODCR_MSSQL_HOST=localhost*
 #   ODCR_ORACLE_HOST=localhost* ODCR_TRINO_HOST=localhost* ODCR_MONGO_URI=mongodb://localhost:27017*
+#   ODCR_CLICKHOUSE_HOST=localhost* ODCR_KAFKA_BOOTSTRAP=localhost:9092*
 services:
   postgres:
     image: postgres:16
@@ -33,3 +34,10 @@ services:
   mongodb:
     image: mongo:7
     ports: ["27017:27017"]
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment: {CLICKHOUSE_USER: odcr, CLICKHOUSE_PASSWORD: odcr, CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"}
+    ports: ["8123:8123"]
+  kafka:
+    image: apache/kafka:latest
+    ports: ["9092:9092"]

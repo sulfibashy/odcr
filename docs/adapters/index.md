@@ -17,11 +17,19 @@ which drivers are installed.
 | [Oracle Database](oracle.md) | `oracle` | on-premise, Oracle Cloud (Autonomous), AWS RDS | `pip install odcr-oracle` | CI |
 | [IBM Db2](db2.md) | `db2` | on-premise, IBM Cloud | `pip install odcr-db2` | with credentials |
 | [Trino / Starburst / Presto](trino.md) | `trino` | on-premise, Starburst Galaxy, AWS EMR | `pip install odcr-trino` | CI |
+| [ClickHouse](clickhouse.md) | `clickhouse` | on-premise, ClickHouse Cloud, Altinity, Aiven; embedded with chDB | `pip install odcr-clickhouse` | CI |
+| [Vertica](vertica.md) | `vertica` | on-premise, AWS, Azure, GCP (Eon mode) | `pip install odcr-vertica` | with credentials |
+| [Teradata Vantage](teradata.md) | `teradata` | on-premise, VantageCloud on AWS, Azure, GCP | `pip install odcr-teradata` | with credentials |
+| [SAP HANA](saphana.md) | `saphana` | SAP HANA Cloud, on-premise, SAP Datasphere | `pip install odcr-saphana` | with credentials |
+| [Apache Hive / Spark SQL](hive.md) | `hive` | on-premise Hadoop, Cloudera CDP, Amazon EMR, Google Dataproc, Azure HDInsight | `pip install odcr-hive` | with credentials |
+| [Apache Impala](impala.md) | `impala` | Cloudera CDP / CDH, on-premise | `pip install odcr-impala` | with credentials |
 | [Snowflake](snowflake.md) | `snowflake` | AWS, Azure, GCP | `pip install odcr-snowflake` | with credentials |
 | [Databricks](databricks.md) | `databricks` | Azure, AWS, GCP | `pip install odcr-databricks` | with credentials |
 | [Google BigQuery](bigquery.md) | `bigquery` | GCP | `pip install odcr-bigquery` | with credentials |
 | [Amazon Redshift](redshift.md) | `redshift` | AWS | `pip install odcr-redshift` | with credentials |
 | [Amazon Athena](athena.md) | `athena` | AWS | `pip install odcr-athena` | with credentials |
+| [Apache Kafka](kafka.md) | `kafka` | on-premise, Confluent Cloud, Amazon MSK, Aiven, Redpanda, IBM Event Streams | `pip install odcr-kafka` | CI |
+| [Azure Event Hubs](eventhubs.md) | `eventhubs` | Azure | `pip install odcr-eventhubs` | with credentials |
 | [MongoDB](mongodb.md) | `mongodb` | on-premise, MongoDB Atlas, Amazon DocumentDB, Azure Cosmos DB for MongoDB | `pip install odcr-mongodb` | CI |
 | [Azure Cosmos DB (NoSQL)](cosmosdb.md) | `cosmosdb` | Azure | `pip install odcr-cosmosdb` | with credentials |
 

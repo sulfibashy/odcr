@@ -2,13 +2,15 @@
 
 The `db` fixture runs every end-to-end test against every adapter that is reachable:
 
-* always:          duckdb, sqlite, files (local folder), mongodb (in-memory mock when no server)
-* with a server:   postgres, mysql, mariadb, sqlserver, oracle, trino, mongodb  (see docker-compose.yml)
-* with credentials: snowflake, databricks, bigquery, redshift, athena, synapse, fabric, cosmosdb, db2
+* always:          duckdb, sqlite, files (local folder), mongodb and kafka (in-memory when no server)
+* with a server:   postgres, mysql, mariadb, sqlserver, oracle, trino, clickhouse, mongodb, kafka
+                   (see docker-compose.yml)
+* with credentials: snowflake, databricks, bigquery, redshift, athena, synapse, fabric, cosmosdb, db2, vertica,
+                   teradata, saphana, hive, impala, eventhubs
 
 Servers are found through environment variables (defaults match docker-compose.yml):
   ODCR_PG_HOST, ODCR_MYSQL_HOST, ODCR_MARIADB_HOST, ODCR_MSSQL_HOST, ODCR_ORACLE_HOST, ODCR_TRINO_HOST,
-  ODCR_MONGO_URI. Any adapter can also be configured with ODCR_TEST_<ADAPTER>='{"key": "value", ...}' (JSON
+  ODCR_CLICKHOUSE_HOST, ODCR_MONGO_URI, ODCR_KAFKA_BOOTSTRAP. Any adapter can also be configured with ODCR_TEST_<ADAPTER>='{"key": "value", ...}' (JSON
   connection options, e.g. ODCR_TEST_SNOWFLAKE). Unreachable targets are skipped, never failed.
 """
 
@@ -30,9 +32,10 @@ from odcr.adapters import get_adapter, resolve
 from odcr.config import Config
 from odcr.scaffold import contract_yaml
 
-ALWAYS = ("duckdb", "sqlite", "files", "mongodb")
-SERVERS = ("postgres", "mysql", "mariadb", "sqlserver", "oracle", "trino")
-CLOUD = ("snowflake", "databricks", "bigquery", "redshift", "athena", "synapse", "fabric", "cosmosdb", "db2")
+ALWAYS = ("duckdb", "sqlite", "files", "mongodb", "kafka")
+SERVERS = ("postgres", "mysql", "mariadb", "sqlserver", "oracle", "trino", "clickhouse")
+CLOUD = ("snowflake", "databricks", "bigquery", "redshift", "athena", "synapse", "fabric", "cosmosdb", "db2",
+         "vertica", "teradata", "saphana", "hive", "impala", "eventhubs")
 TARGETS = ALWAYS + SERVERS + CLOUD
 
 _TMP = Path(os.environ.get("ODCR_TEST_TMP", "")) if os.environ.get("ODCR_TEST_TMP") else None
@@ -58,6 +61,15 @@ def connection_options(target: str, tmp: Path | None = None) -> dict[str, Any] |
         uri = _env("ODCR_MONGO_URI")
         return {"type": "mongodb", "uri": uri, "database": "odcr_test"} if uri else \
             {"type": "mongodb", "mock": True, "database": "odcr_test"}
+    if target == "kafka":
+        servers = _env("ODCR_KAFKA_BOOTSTRAP")
+        base = {"type": "kafka", "group_id": f"odcr_test_{uuid.uuid4().hex[:6]}", "timeout": 20,
+                "meta_path": str(tmp / "odcr_kafka_meta.duckdb")}
+        return {**base, "bootstrap_servers": servers} if servers else {**base, "mock": True}
+    if target == "clickhouse" and _env("ODCR_CLICKHOUSE_HOST"):
+        return {"type": "clickhouse", "host": _env("ODCR_CLICKHOUSE_HOST"), "port": _env("ODCR_CLICKHOUSE_PORT", "8123"),
+                "user": _env("ODCR_CLICKHOUSE_USER", "odcr"), "password": _env("ODCR_CLICKHOUSE_PASSWORD", "odcr"),
+                "database": _env("ODCR_CLICKHOUSE_DATABASE", "default")}
     if target == "postgres":
         return {"type": "postgres", "host": _env("ODCR_PG_HOST", "localhost"), "port": _env("ODCR_PG_PORT", "5432"),
                 "user": _env("ODCR_PG_USER", "postgres"), "password": _env("ODCR_PG_PASSWORD", "postgres"),

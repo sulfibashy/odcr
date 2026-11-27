@@ -1,0 +1,22 @@
+{
+  "project": "vertica_example",
+  "adapter": "vertica",
+  "created_by": "odcr init",
+  "files": [
+    ".env.example",
+    ".github/workflows/contracts.yml",
+    ".gitignore",
+    "README.md",
+    "azure-pipelines.yml",
+    "contracts/sales/orders.odcs.yaml",
+    "jobs/ingestion_gate.ps1",
+    "jobs/ingestion_gate.py",
+    "jobs/ingestion_gate.sh",
+    "odcr.yaml",
+    "pipelines/azure-devops/data-pipeline.yml",
+    "pipelines/github-actions/data-pipeline.yml",
+    "reconciliations/orders.recon.yaml",
+    "seeds/orders.csv",
+    "tests/test_contracts.py"
+  ]
+}

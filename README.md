@@ -66,13 +66,15 @@ odcr watch --contract-id orders -C lake                          # every new fil
 | --- | --- | --- |
 | **Files** | Parquet / CSV / JSON in local folders, network shares, **ADLS Gen2**, Azure Blob, **S3**, **GCS**, MinIO | `odcr-files` |
 | **Embedded** | DuckDB, SQLite | `odcr-duckdb`, `odcr` |
-| **On-premise / open source** | PostgreSQL, MySQL, MariaDB, **SQL Server**, **Oracle**, **IBM Db2**, Trino / Starburst / Presto | `odcr-postgres` `odcr-mysql` `odcr-sqlserver` `odcr-oracle` `odcr-db2` `odcr-trino` |
-| **Azure** | **Databricks**, **Synapse Analytics**, **Fabric Warehouse**, Azure SQL, **Cosmos DB**, Azure PostgreSQL / MySQL | `odcr-databricks` `odcr-synapse` `odcr-fabric` `odcr-sqlserver` `odcr-cosmosdb` |
+| **Streaming** | **Apache Kafka** (Confluent, MSK, Redpanda, Aiven), **Azure Event Hubs** | `odcr-kafka` `odcr-eventhubs` |
+| **On-premise / open source** | PostgreSQL (Greenplum, CockroachDB, YugabyteDB, TimescaleDB), MySQL, MariaDB, **SQL Server**, **Oracle**, **IBM Db2**, **Teradata**, **SAP HANA**, **Vertica**, **ClickHouse**, Trino / Starburst / Presto | `odcr-postgres` `odcr-mysql` `odcr-sqlserver` `odcr-oracle` `odcr-db2` `odcr-teradata` `odcr-saphana` `odcr-vertica` `odcr-clickhouse` `odcr-trino` |
+| **Hadoop** | **Hive**, **Spark SQL** (Thrift server), **Impala** — Cloudera, EMR, Dataproc, HDInsight | `odcr-hive` `odcr-impala` |
+| **Azure** | **Databricks**, **Synapse Analytics**, **Fabric Warehouse**, Azure SQL, **Cosmos DB**, **Event Hubs**, Azure PostgreSQL / MySQL | `odcr-databricks` `odcr-synapse` `odcr-fabric` `odcr-sqlserver` `odcr-cosmosdb` `odcr-eventhubs` |
 | **AWS** | Databricks, **Redshift**, **Athena**, Aurora / RDS, DocumentDB | `odcr-databricks` `odcr-redshift` `odcr-athena` `odcr-postgres` `odcr-mongodb` |
 | **GCP** | Databricks, **BigQuery**, Cloud SQL, AlloyDB | `odcr-databricks` `odcr-bigquery` `odcr-postgres` |
-| **Multi-cloud** | **Snowflake**, **MongoDB** / Atlas | `odcr-snowflake` `odcr-mongodb` |
+| **Multi-cloud** | **Snowflake**, **MongoDB** / Atlas, ClickHouse Cloud, Teradata VantageCloud | `odcr-snowflake` `odcr-mongodb` `odcr-clickhouse` `odcr-teradata` |
 
-18 adapters; `pip install odcr-all` installs every driver. Each has a ready-to-run reference project in
+26 adapters; `pip install odcr-all` installs every driver. Each has a ready-to-run reference project in
 [`examples/`](examples/) and a [documentation page](https://sulfibashy.github.io/odcr/adapters/).
 **Informatica, Ab Initio, Azure Data Factory, SSIS, Airflow and Databricks Workflows** call odcr after they land
 data — see [Integrations](https://sulfibashy.github.io/odcr/integrations/).

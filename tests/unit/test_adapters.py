@@ -68,6 +68,9 @@ def test_compare_and_describe_edges():
     ("date", "date", True), ("date", "datetime", False), ("date", "bsondate", True),
     ("timestamp", "timestamp_ntz", True), ("timestamp", "datetime2", True), ("timestamp", "timestamp(6)", True),
     ("boolean", "bit", True), ("boolean", "bool", True),
+    ("integer", "Nullable(Int32)", True), ("integer", "uint64", True), ("string", "LowCardinality(Nullable(String))", True),
+    ("number", "Nullable(Decimal(12, 2))", True), ("timestamp", "DateTime64(6)", True), ("date", "Date32", True),
+    ("string", "Nullable(Int32)", False), ("timestamp", "seconddate", True), ("string", "alphanum", True),
 ])
 def test_type_matches(logical, physical, ok):
     assert type_matches(logical, physical) is ok
@@ -104,6 +107,8 @@ def test_quote_policy_needed_keeps_simple_names_unquoted():
 @pytest.mark.parametrize("name,expected", [
     ("postgres", "SELECT x FROM t LIMIT 5"), ("sqlserver", "SELECT TOP 5 x FROM t"),
     ("oracle", "SELECT x FROM t FETCH FIRST 5 ROWS ONLY"), ("db2", "SELECT x FROM t FETCH FIRST 5 ROWS ONLY"),
+    ("teradata", "SELECT TOP 5 x FROM t"), ("clickhouse", "SELECT x FROM t LIMIT 5"),
+    ("saphana", "SELECT x FROM t LIMIT 5"), ("hive", "SELECT x FROM t LIMIT 5"),
 ])
 def test_limit(name, expected):
     assert make(name).limit("SELECT x FROM t", 5) == expected
@@ -178,7 +183,8 @@ def test_build_checks():
 
 
 @pytest.mark.parametrize("name", ["postgres", "mysql", "sqlserver", "oracle", "snowflake", "databricks", "bigquery",
-                                  "trino", "duckdb", "sqlite", "db2", "redshift", "athena", "synapse", "fabric"])
+                                  "trino", "duckdb", "sqlite", "db2", "redshift", "athena", "synapse", "fabric",
+                                  "clickhouse", "vertica", "teradata", "saphana", "hive", "impala"])
 def test_metric_sql_for_every_sql_adapter(name):
     a = make(name)
     obj = contract().schema[0]
@@ -202,10 +208,13 @@ def test_sql_adapter_rejects_other_engines():
                                          ("fabric", "DATETIME2(6)"), ("databricks", "USING DELTA"),
                                          ("oracle", "VARCHAR2(4000)"), ("snowflake", "TIMESTAMP_NTZ"),
                                          ("bigquery", "INT64"), ("redshift", "VARCHAR(65535)"), ("db2", "CREATE TABLE"),
-                                         ("trino", "TIMESTAMP(6)"), ("sqlite", "TEXT"), ("duckdb", "VARCHAR")])
+                                         ("trino", "TIMESTAMP(6)"), ("sqlite", "TEXT"), ("duckdb", "VARCHAR"),
+                                         ("clickhouse", "ENGINE = MergeTree"), ("vertica", "CREATE SCHEMA IF NOT EXISTS"),
+                                         ("teradata", "MULTISET"), ("saphana", "CREATE COLUMN TABLE"),
+                                         ("hive", "STRING"), ("impala", "BIGINT")])
 def test_meta_ddl_per_dialect(name, marker):
     stmts = ddl(make(name), "odcr_meta")
-    assert sum(1 for s in stmts if "CREATE TABLE" in s) == len(TABLES)
+    assert sum(1 for s in stmts if " TABLE " in s) == len(TABLES)
     assert any(marker in s for s in stmts)
 
 
@@ -231,3 +240,48 @@ def test_cosmos_query_builders():
     sql, _ = a.metric_query(Check("d", "quality", "o", "o", None, "error", metric="duplicateValues",
                                   args={"properties": ["a", "b"]}))
     assert 'GROUP BY c["a"], c["b"]' in sql
+
+
+def test_new_dialect_literals():
+    import datetime as dt
+    ch = make("clickhouse")
+    assert ch.literal("a'b\\c") == "'a\\'b\\\\c'"
+    assert ch.literal(dt.datetime(2026, 1, 2, 3, 4, 5)) == "toDateTime64('2026-01-02 03:04:05.000000', 6)"
+    assert ch.literal(dt.date(2026, 1, 2)) == "toDate('2026-01-02')"
+    assert make("impala").literal(dt.date(2026, 1, 2)) == "CAST('2026-01-02' AS DATE)"
+    assert make("teradata").limit("SELECT DISTINCT x FROM t", 3) == "SELECT DISTINCT TOP 3 x FROM t"
+    assert make("teradata").meta_table("odcr_meta", "validation_runs") == "odcr_meta_validation_runs"
+
+
+def test_kafka_and_event_hubs_settings():
+    k = make("kafka", bootstrap_servers="b:9092", security_protocol="SASL_SSL", sasl_mechanism="PLAIN",
+             config={"linger.ms": 5})
+    conf = k.consumer_config()
+    assert conf["bootstrap.servers"] == "b:9092" and conf["security.protocol"] == "SASL_SSL"
+    assert conf["linger.ms"] == 5 and conf["group.id"] == "odcr" and conf["enable.auto.commit"] is False
+    assert {"_kafka_offset", "_kafka_key"} <= set(k.system_columns())
+    eh = make("eventhubs", namespace="mybus", connection_string="Endpoint=sb://mybus/;SharedAccessKey=x")
+    conf = eh.consumer_config()
+    assert conf["bootstrap.servers"] == "mybus.servicebus.windows.net:9093"
+    assert conf["sasl.username"] == "$ConnectionString" and conf["group.id"] == "$Default"
+    assert make("eventhubs", namespace="mybus", consumer_group="odcr", mock=True).consumer_config()["group.id"] == "odcr"
+
+
+def test_kafka_micro_batches_and_invalid_messages():
+    from odcr.adapters.kafka import MemoryKafka
+
+    a = get_adapter({"type": "kafka", "mock": True, "group_id": "unit"})
+    a.connect()
+    a.create_sample("unit_topic", [("id", "integer"), ("name", "string")], [(1, "a"), (2, "b")])
+    MemoryKafka.Producer({}).produce("unit_topic", b"not json")
+    assert a.count("unit_topic") == 3
+    assert a.count("unit_topic", "_kafka_value IS NOT NULL") == 1
+    assert {"id", "name", "_kafka_partition"} <= set(a.columns("unit_topic"))
+    a.close()
+    a.connect()  # a new run only sees messages that arrived since the last one
+    assert a.count("unit_topic") == 0
+    a.create_sample("unit_topic", [("id", "integer"), ("name", "string")], [(3, "c")])
+    assert a.count("unit_topic") == 1
+    assert a.columns("missing_topic") == {}
+    a.drop_table("unit_topic")
+    a.close()

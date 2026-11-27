@@ -4,7 +4,7 @@ PostgreSQL and PostgreSQL-compatible databases.
 
 | | |
 | --- | --- |
-| Adapter name | `postgres` (aliases: `postgresql`, `aurora-postgres`, `azure-postgres`, `cloudsql-postgres`, `alloydb`, `supabase`, `neon`) |
+| Adapter name | `postgres` (aliases: `postgresql`, `aurora-postgres`, `azure-postgres`, `cloudsql-postgres`, `alloydb`, `supabase`, `neon`, `greenplum`, `cockroachdb`, `yugabytedb`, `timescaledb`, `citus`) |
 | Runs on | on-premise, AWS RDS/Aurora, Azure, GCP Cloud SQL/AlloyDB |
 | Install | `pip install odcr-postgres` |
 | Python driver | `psycopg` |
@@ -39,7 +39,7 @@ reads a secret file. See [Security](../security.md) for TLS and authentication.
 
 ## Notes
 
-- None.
+- Also Greenplum, CockroachDB, YugabyteDB, TimescaleDB and Citus (PostgreSQL wire protocol).
 
 ## Check it
 

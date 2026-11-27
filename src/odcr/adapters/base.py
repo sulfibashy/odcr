@@ -21,18 +21,19 @@ if TYPE_CHECKING:  # pragma: no cover
 TYPE_FAMILIES: dict[str, set[str]] = {
     "integer": {"int", "integer", "bigint", "smallint", "tinyint", "mediumint", "int2", "int4", "int8", "int16",
                 "int32", "int64", "serial", "bigserial", "number", "long", "hugeint", "ubigint", "uinteger",
-                "byteint", "decfloat"},
+                "byteint", "decfloat", "uint8", "uint16", "uint32", "uint64", "int128", "int256", "uint128", "uint256"},
     "number": {"int", "integer", "bigint", "smallint", "tinyint", "mediumint", "numeric", "decimal", "double",
                "double precision", "float", "real", "money", "smallmoney", "int2", "int4", "int8", "int64",
                "float4", "float8", "float64", "number", "bignumeric", "binary_double", "binary_float", "long",
-               "hugeint", "decfloat", "decimal128", "int32"},
+               "hugeint", "decfloat", "decimal128", "int32", "int16", "float32", "uint8", "uint16", "uint32", "uint64",
+               "int128", "int256", "smalldecimal"},
     "string": {"char", "varchar", "varchar2", "nvarchar2", "text", "character", "character varying", "nvarchar",
                "nchar", "ntext", "tinytext", "mediumtext", "longtext", "string", "uuid", "enum", "citext",
-               "clob", "nclob", "graphic", "vargraphic"},
-    "date": {"date", "bsondate"},
+               "clob", "nclob", "graphic", "vargraphic", "fixedstring", "alphanum", "shorttext", "long varchar"},
+    "date": {"date", "bsondate", "date32"},
     "timestamp": {"timestamp", "datetime", "datetime2", "smalldatetime", "datetimeoffset", "timestamptz",
                   "timestamp with time zone", "timestamp without time zone", "timestamp_ntz", "timestamp_ltz",
-                  "timestamp_tz", "bsondate", "timestmp"},
+                  "timestamp_tz", "bsondate", "timestmp", "datetime64", "seconddate"},
     "boolean": {"bool", "boolean", "bit", "tinyint"},
 }
 
@@ -54,6 +55,9 @@ def type_matches(logical_type: str | None, data_type: str | None) -> bool | None
     if family is None:
         return None
     t = data_type.lower().strip()
+    wrappers = ("nullable(", "lowcardinality(")  # ClickHouse: Nullable(String), LowCardinality(String)
+    while t.endswith(")") and t.startswith(wrappers):
+        t = t[t.index("(") + 1:-1].strip()
     return t in family or any(t.startswith(k + " ") or t.startswith(k + "(") or t.startswith(k + "<")
                               for k in family)
 
@@ -480,8 +484,15 @@ class Adapter:
         types = self.sample_types()
         self.drop_table(name)
         cols_sql = ", ".join(f"{self.quote(c)} {types[t]}" for c, t in columns)
-        self.execute(f"CREATE TABLE {self.qualify(name)} ({cols_sql})")
+        self.execute(self.sample_table_sql(self.qualify(name), cols_sql))
         if rows:
             names = ", ".join(self.quote(c) for c, _ in columns)
-            self.executemany(f"INSERT INTO {self.qualify(name)} ({names}) VALUES ({self.params(len(columns))})",
-                             rows)
+            head = f"INSERT INTO {self.qualify(name)} ({names}) VALUES "
+            group = f"({self.params(len(columns))})"
+            if self.multi_row_insert:  # one statement: engines where every INSERT is a job or a data part
+                self.execute(head + ", ".join([group] * len(rows)), [v for r in rows for v in r])
+            else:
+                self.executemany(head + group, rows)
+
+    def sample_table_sql(self, table: str, columns_sql: str) -> str:
+        return f"CREATE TABLE {table} ({columns_sql})"

@@ -13,6 +13,17 @@ All notable changes to this project are documented here. The format follows
   quotes needed (zsh on macOS treats `odcr[postgres]` as a pattern). `pip install "odcr[postgres]"` still works.
 - `odcr adapters`, `odcr init` and every error message now show the `odcr-<platform>` package to install.
 
+- 8 new adapters (26 in total), each with its own package and reference project:
+  - **Streaming:** `odcr-kafka` (Apache Kafka, Confluent, MSK, Redpanda, Aiven) and `odcr-eventhubs` (Azure Event
+    Hubs over its Kafka endpoint, with Entra ID — no stored secret). The topic is the object; each run checks the
+    messages that arrived since the last run, then commits the offsets. `mock: true` runs an in-memory broker.
+  - **Warehouses and on-premise:** `odcr-teradata`, `odcr-saphana`, `odcr-vertica`, `odcr-clickhouse`
+    (also embedded through chDB).
+  - **Hadoop:** `odcr-hive` (Hive and Spark SQL Thrift server) and `odcr-impala`.
+- New aliases: Greenplum, CockroachDB, YugabyteDB, TimescaleDB, Citus (PostgreSQL); SingleStore, PlanetScale (MySQL);
+  Delta Lake and Iceberg tables in storage through the files adapter (`delta_scan`, `iceberg_scan`).
+- ClickHouse and Kafka run end-to-end in CI; Kafka also runs against the in-memory broker on every OS.
+
 ### Changed
 - Synapse and Fabric have their own `synapse` and `fabric` extras.
 

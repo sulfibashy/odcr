@@ -4,7 +4,7 @@ MySQL, MariaDB and MySQL-compatible databases.
 
 | | |
 | --- | --- |
-| Adapter name | `mysql` (aliases: `mariadb`, `aurora-mysql`, `azure-mysql`, `cloudsql-mysql`, `tidb`) |
+| Adapter name | `mysql` (aliases: `mariadb`, `aurora-mysql`, `azure-mysql`, `cloudsql-mysql`, `tidb`, `singlestore`, `planetscale`) |
 | Runs on | on-premise, AWS RDS/Aurora, Azure, GCP Cloud SQL |
 | Install | `pip install odcr-mysql` |
 | Python driver | `pymysql` |
@@ -39,7 +39,7 @@ reads a secret file. See [Security](../security.md) for TLS and authentication.
 
 ## Notes
 
-- None.
+- Also TiDB, SingleStore and PlanetScale (MySQL wire protocol).
 
 ## Check it
 

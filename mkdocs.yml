@@ -55,6 +55,12 @@ nav:
       - Oracle: adapters/oracle.md
       - IBM Db2: adapters/db2.md
       - Trino / Starburst: adapters/trino.md
+      - ClickHouse: adapters/clickhouse.md
+      - Vertica: adapters/vertica.md
+      - Teradata: adapters/teradata.md
+      - SAP HANA: adapters/saphana.md
+      - Hive / Spark SQL: adapters/hive.md
+      - Impala: adapters/impala.md
       - Snowflake: adapters/snowflake.md
       - Databricks: adapters/databricks.md
       - BigQuery: adapters/bigquery.md
@@ -62,6 +68,8 @@ nav:
       - Athena: adapters/athena.md
       - MongoDB: adapters/mongodb.md
       - Cosmos DB: adapters/cosmosdb.md
+      - Kafka: adapters/kafka.md
+      - Azure Event Hubs: adapters/eventhubs.md
   - Integrations:
       - Overview: integrations/index.md
       - Airflow: integrations/airflow.md

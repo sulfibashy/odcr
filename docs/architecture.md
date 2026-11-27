@@ -87,7 +87,7 @@ data leaves the platform and checks scale with the platform, not with the machin
 | `odcr` CLI / Python package | pipeline agent, scheduler host, container, Databricks cluster | `pip install odcr-<adapter>` |
 | Project (`odcr.yaml`) | a Git repository of the data / platform team | connections, meta schema, alerts, where the contracts are |
 | Contract repository | GitHub, Azure Repos, GitLab, Bitbucket, or a folder | ODCS YAML, reviewed by producers and consumers |
-| Adapters | inside the package | 18 platforms; one small class each |
+| Adapters | inside the package | 26 platforms; one small class each |
 | Meta tables | `odcr_meta` schema on each platform (or one central platform) | history for audits and dashboards |
 | Alert channels | Teams, Slack, email, Google Chat, Discord, PagerDuty, Opsgenie, webhooks | source team + platform team |
 

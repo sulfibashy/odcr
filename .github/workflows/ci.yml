@@ -77,6 +77,13 @@ jobs:
       trino:
         image: trinodb/trino:latest
         ports: ["8080:8080"]
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
+        env: {CLICKHOUSE_USER: odcr, CLICKHOUSE_PASSWORD: odcr, CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"}
+        ports: ["8123:8123"]
+      kafka:
+        image: apache/kafka:latest
+        ports: ["9092:9092"]
       mongodb:
         image: mongo:7
         ports: ["27017:27017"]
@@ -92,6 +99,8 @@ jobs:
       ODCR_ORACLE_HOST: localhost
       ODCR_TRINO_HOST: localhost
       ODCR_MONGO_URI: mongodb://localhost:27017
+      ODCR_CLICKHOUSE_HOST: localhost
+      ODCR_KAFKA_BOOTSTRAP: localhost:9092
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -101,10 +110,16 @@ jobs:
         run: |
           mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "GRANT ALL ON *.* TO 'odcr'@'%'; FLUSH PRIVILEGES;"
           mysql -h 127.0.0.1 -P 3307 -uroot -proot -e "GRANT ALL ON *.* TO 'odcr'@'%'; FLUSH PRIVILEGES;"
-      - name: Wait for SQL Server and Trino
+      - name: Wait for SQL Server, Trino and ClickHouse
         run: |
           python - <<'PY'
           import time, urllib.request, json
+          for i in range(60):
+              try:
+                  urllib.request.urlopen("http://localhost:8123/ping")
+                  break
+              except Exception:
+                  time.sleep(2)
           import pytds
           for i in range(60):
               try:
@@ -139,6 +154,12 @@ jobs:
       ODCR_TEST_FABRIC: ${{ secrets.ODCR_TEST_FABRIC }}
       ODCR_TEST_COSMOSDB: ${{ secrets.ODCR_TEST_COSMOSDB }}
       ODCR_TEST_DB2: ${{ secrets.ODCR_TEST_DB2 }}
+      ODCR_TEST_VERTICA: ${{ secrets.ODCR_TEST_VERTICA }}
+      ODCR_TEST_TERADATA: ${{ secrets.ODCR_TEST_TERADATA }}
+      ODCR_TEST_SAPHANA: ${{ secrets.ODCR_TEST_SAPHANA }}
+      ODCR_TEST_HIVE: ${{ secrets.ODCR_TEST_HIVE }}
+      ODCR_TEST_IMPALA: ${{ secrets.ODCR_TEST_IMPALA }}
+      ODCR_TEST_EVENTHUBS: ${{ secrets.ODCR_TEST_EVENTHUBS }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

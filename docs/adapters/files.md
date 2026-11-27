@@ -4,7 +4,7 @@ Checks Parquet, CSV and JSON files where they land, before loading (DuckDB engin
 
 | | |
 | --- | --- |
-| Adapter name | `files` (aliases: `adls`, `azure-storage`, `s3`, `gcs`, `landing`, `parquet`, `csv`) |
+| Adapter name | `files` (aliases: `adls`, `azure-storage`, `s3`, `gcs`, `landing`, `parquet`, `csv`, `delta`, `iceberg`, `onelake`) |
 | Runs on | local, network shares, Azure ADLS Gen2/Blob, AWS S3, GCP GCS, MinIO |
 | Install | `pip install odcr-files` |
 | Python driver | `duckdb` |
@@ -38,6 +38,7 @@ reads a secret file. See [Security](../security.md) for TLS and authentication.
 ## Notes
 
 - physicalName is a path or glob: abfss://container@account.dfs.core.windows.net/orders/*.parquet
+- Delta Lake and Iceberg tables in storage: physicalName: "delta_scan('abfss://...')" or "iceberg_scan('s3://...')".
 - Authentication: credential chain (Managed Identity, az login, AWS profile) by default; service principal or keys via environment variables.
 
 ## Check it
