@@ -42,6 +42,7 @@ reads a secret file. See [Security](../security.md) for TLS and authentication.
 ## Notes
 
 - Entra ID: set authentication: ActiveDirectoryMsi (or ActiveDirectoryInteractive) and leave user/password empty.
+- Windows authentication: trusted_connection: yes and leave user/password empty; odcr connects as the account that runs it (service account, SQL Agent proxy, gMSA).
 - No ODBC driver available? Set client: pytds.
 - TLS is on and the server certificate is verified (encrypt: yes). For a private CA, install it in the OS trust store; trust_server_certificate: true is for local development only.
 

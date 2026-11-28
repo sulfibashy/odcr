@@ -51,6 +51,10 @@ class SQLServerAdapter(Adapter):
         ]
         if o.get("authentication"):  # e.g. ActiveDirectoryInteractive, ActiveDirectoryMsi, ActiveDirectoryPassword
             parts.append(f"Authentication={o['authentication']}")
+        if str(o.get("trusted_connection", "")).lower() in ("yes", "true", "1"):
+            # Windows authentication: the account running odcr (service account, SQL Agent proxy, gMSA),
+            # or a Kerberos ticket on Linux. No user or password.
+            parts.append("Trusted_Connection=yes")
         if o.get("user") or o.get("username"):
             parts += [f"UID={o.get('user') or o.get('username')}", f"PWD={o.get('password', '')}"]
         return pyodbc.connect(";".join(parts), autocommit=True)

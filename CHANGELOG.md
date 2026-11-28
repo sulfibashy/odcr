@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Docs: "Where and when odcr runs" — the four gates (files, batch, streaming, reconcile) and scenarios for Windows /
+  SQL Server Agent, Linux / cron / Airflow, Azure Data Factory, Databricks, streaming / CDC, events, AWS / GCP and
+  Kubernetes, with flow diagrams.
+- SQL Server: Windows authentication with `trusted_connection: yes` (no user or password).
 - Container image `ghcr.io/sulfibashy/odcr` (linux/amd64 and linux/arm64) with odcr, every driver and the
   Microsoft ODBC Driver 18, published on every release: `docker run ghcr.io/sulfibashy/odcr odcr run ...`.
 

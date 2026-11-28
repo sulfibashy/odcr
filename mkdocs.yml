@@ -38,6 +38,7 @@ nav:
   - Concepts:
       - Contract repository: concepts/contract-repository.md
       - What odcr checks: concepts/contracts.md
+      - Where and when odcr runs: concepts/deployment-scenarios.md
       - When data lands: concepts/when-data-lands.md
       - Reconciliation: concepts/reconciliation.md
       - Observability: concepts/observability.md

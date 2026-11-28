@@ -85,7 +85,10 @@ ADAPTERS: dict[str, AdapterInfo] = {a.name: a for a in [
                  "password": "${MSSQL_PASSWORD:-}", "client": "pyodbc", "encrypt": "yes"},
                 aliases=("mssql", "azuresql", "azure-sql", "sql-managed-instance"),
                 notes=["Entra ID: set authentication: ActiveDirectoryMsi (or ActiveDirectoryInteractive) and "
-                       "leave user/password empty.", "No ODBC driver available? Set client: pytds.",
+                       "leave user/password empty.",
+                       "Windows authentication: trusted_connection: yes and leave user/password empty; odcr connects "
+                       "as the account that runs it (service account, SQL Agent proxy, gMSA).",
+                       "No ODBC driver available? Set client: pytds.",
                        "TLS is on and the server certificate is verified (encrypt: yes). For a private CA, install "
                        "it in the OS trust store; trust_server_certificate: true is for local development only."]),
     AdapterInfo("synapse", "Azure Synapse Analytics", "sqlserver:SynapseAdapter", "cloud", "Azure", "synapse",

@@ -285,3 +285,13 @@ def test_kafka_micro_batches_and_invalid_messages():
     assert a.columns("missing_topic") == {}
     a.drop_table("unit_topic")
     a.close()
+
+
+def test_sqlserver_windows_authentication(monkeypatch):
+    import sys
+    import types
+    seen = {}
+    fake = types.SimpleNamespace(connect=lambda cs, autocommit: seen.setdefault("cs", cs))
+    monkeypatch.setitem(sys.modules, "pyodbc", fake)
+    make("sqlserver", host="sql01", database="dw", trusted_connection="yes")._connect()
+    assert "Trusted_Connection=yes" in seen["cs"] and "UID=" not in seen["cs"]

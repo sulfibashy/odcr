@@ -100,5 +100,6 @@ data leaves the platform and checks scale with the platform, not with the machin
 | Storage event → Function / Lambda → `odcr run --for-object <file>` | files dropped in ADLS / S3 / GCS |
 | Scheduler (`odcr watch --once` every N minutes) | simple setups, on-premise schedulers |
 
-See [Running in pipelines](getting-started/pipelines.md) for ready-made Azure DevOps and GitHub Actions
+See [Where and when odcr runs](concepts/deployment-scenarios.md) for scenarios on Windows, Linux, Azure, AWS,
+Databricks, streaming and Kubernetes, [Running in pipelines](getting-started/pipelines.md) for ready-made Azure DevOps and GitHub Actions
 templates, and [Commands](reference/cli.md) for every command.
